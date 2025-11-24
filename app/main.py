@@ -1,3 +1,8 @@
+# TODO:
+# - Add date check so people can't book tickets for wierd dates
+# - add more checks or validations
+
+
 import time
 from fastapi import FastAPI, HTTPException
 from models import *
@@ -29,11 +34,12 @@ def on_startup():
 
 # --- Requests ---------------------------------------
 
-@app.get("/")
-def read_root():
-    return {"Hello": "World"}
+# @app.get("/")
+# def read_root():
+#     return {"Hello": "World"}
 
 
+# TODO: remomve
 @app.post("/users/")
 def create_user(user: Users):
     with Session(engine) as session:
@@ -42,11 +48,11 @@ def create_user(user: Users):
         session.refresh(user)
         return user
 
-@app.get("/users/")
-def read_users():
-    with Session(engine) as session:
-        users = session.exec(select(Users)).all()
-        return users
+# @app.get("/users/")
+# def read_users():
+#     with Session(engine) as session:
+#         users = session.exec(select(Users)).all()
+#         return users
 
 
 @app.get("/tickets/")
@@ -55,13 +61,13 @@ def read_tickets():
         tickets = session.exec(select(Tickets)).all()
         return tickets
     
-@app.post("/tickets/")
-def create_ticket(ticket: Tickets):
-    with Session(engine) as session:
-        session.add(ticket)
-        session.commit()
-        session.refresh(ticket)
-        return ticket
+# @app.post("/tickets/")
+# def create_ticket(ticket: Tickets):
+#     with Session(engine) as session:
+#         session.add(ticket)
+#         session.commit()
+#         session.refresh(ticket)
+#         return ticket
     
 
 # return next two fridays from today
@@ -83,23 +89,51 @@ def get_fridays():
     return {"fridays": fridays}
 
 
-# list of avaliable tickets on date
-# @app.get("/available_tickets/{date}")
-# def available_tickets(date: str):
-#     from datetime import datetime
+# list of avaliable tickets on date with type (date&type) format: YYYY-MM-DD&<type>
+@app.get("/available_tickets/{date}&{type}")
+def available_tickets(date: str, type: str):
+    from datetime import datetime, date as dt_date
+    from sqlalchemy import func
 
-#     try:
-#         query_date = datetime.strptime(date, "%Y-%m-%d").date()
-#     except ValueError:
-#         raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
+    query_date = datetime.strptime(date, "%Y-%m-%d").date()
+    with Session(engine) as session:
+        tickets = session.exec(
+            select(Tickets).where(
+                func.date(Tickets.timestamp) == query_date,
+                Tickets.type == type
+            )
+        ).all()
+        return tickets
+    
 
-#     with Session(engine) as session:
-#         booked_tickets = session.exec(
-#             select(Tickets).where(Tickets.timestamp.cast(Date) == query_date)
-#         ).all()
-#         booked_numbers = {ticket.number for ticket in booked_tickets}
+# book ticket, example: /book_ticket/1&dept&2024-07-12T12:42:20
+@app.post("/book_ticket/{user_id}&{type}&{timestamp}")
+def book_ticket(user_id: int, type: str, timestamp: datetime.datetime):
+    with Session(engine) as session:
+        ticket = Tickets(type=type, user_id=user_id, timestamp=timestamp)
+        session.add(ticket)
+        session.commit()
+        session.refresh(ticket)
+        return ticket
+    
 
-#         all_ticket_numbers = {f"{i:04d}" for i in range(10000)}
-#         available_numbers = all_ticket_numbers - booked_numbers
+# cancel
+@app.post("/cancel_ticket/{ticket_id}")
+def cancel_ticket(ticket_id: int):
+    with Session(engine) as session:
+        ticket = session.get(Tickets, ticket_id)
+        if not ticket:
+            raise HTTPException(status_code=404, detail="Ticket not found")
+        session.delete(ticket)
+        session.commit()
+        return {"detail": "Ticket canceled"}
 
-#         return {"available_tickets": sorted(list(available_numbers))}
+
+# check own tickets
+@app.get("/use_tickets/{user_id}")
+def use_tickets(user_id: int):
+    with Session(engine) as session:
+        tickets = session.exec(
+            select(Tickets).where(Tickets.user_id == user_id)
+        ).all()
+        return tickets
