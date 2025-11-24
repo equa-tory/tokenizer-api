@@ -7,6 +7,7 @@ class Users(SQLModel, table=True):
     id: int = Field(default=None, primary_key=True)
     name: str
     is_frozen: bool = False
+    telegram_id: Optional[int] = None
 
 
 class Tickets(SQLModel, table=True):
