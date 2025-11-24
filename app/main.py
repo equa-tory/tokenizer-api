@@ -34,7 +34,7 @@ def read_root():
     return {"Hello": "World"}
 
 @app.post("/users/")
-def create_user(user: User):
+def create_user(user: Users):
     with Session(engine) as session:
         session.add(user)
         session.commit()
@@ -44,5 +44,5 @@ def create_user(user: User):
 @app.get("/users/")
 def read_users():
     with Session(engine) as session:
-        users = session.exec(select(User)).all()
+        users = session.exec(select(Users)).all()
         return users
