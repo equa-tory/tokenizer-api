@@ -1,5 +1,9 @@
 # TODO:
 # - Add validation so random request countn't be used (only via *our systems*)
+# - create users in other way (not via API)
+# - use telegram id !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+# - change ticket number to "N-XXXX" format
+# - redo status last ticket
 
 
 import time
@@ -164,9 +168,7 @@ def available_tickets(date: str, type: str):
 @app.post("/book_ticket/{user_id}&{type}&{timestamp}")  # TODO: add timestamp (10 minutes + fridays) validation
 # def book_ticket(user_id: int, type: str, timestamp: datetime):
 def book_ticket(user_id: int, type: str, timestamp: datetime.datetime):
-    
     validate_ticket_timestamp(timestamp)
-    
     with Session(engine) as session:
         # duplicate timestamp check
         existing = session.exec(
@@ -253,6 +255,18 @@ def user_tickets(user_id: int):
         ).all()
         return tickets
 
+@app.get("/tg/user/{user_id}/tickets")
+def tg_user_tickets(tg_id: int):
+    with Session(engine) as session:
+        user = session.exec(select(Users).where(Users.telegram_id == tg_id)).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        tickets = session.exec(
+            select(Tickets).where(Tickets.user_id == user.id)
+        ).all()
+        return tickets
+
 
 # status
 @app.get("/user/{user_id}/status")
@@ -263,24 +277,54 @@ def user_status(user_id: int):
             raise HTTPException(status_code=404, detail="User not found")
 
         # get last ticket
-        last_ticket = session.exec(
-            select(Tickets).order_by(Tickets.id.desc())
-        ).first()
+        # last_ticket = session.exec(
+        #     select(Tickets).order_by(Tickets.id.desc())
+        # ).first()
 
-        last_ticket_data = None
-        if last_ticket:
-            last_ticket_data = {
-                "id": last_ticket.id,
-                "number": last_ticket.number,
-                "type": last_ticket.type,
-                "user_id": last_ticket.user_id,
-                "timestamp": last_ticket.timestamp
-            }
+        # last_ticket_data = None
+        # if last_ticket:
+        #     last_ticket_data = {
+        #         "id": last_ticket.id,
+        #         "number": last_ticket.number,
+        #         "type": last_ticket.type,
+        #         "user_id": last_ticket.user_id,
+        #         "timestamp": last_ticket.timestamp
+        #     }
 
         return {
             "id": user.id,
             "name": user.name,
             "dept_streak": user.dept_streak,
             "telegram_id": user.telegram_id,
-            "last_ticket": last_ticket_data
+            # "last_ticket": last_ticket_data
+        }
+
+@app.get("/tg/user/{user_id}/status")
+def tg_user_status(tg_id: int):
+    with Session(engine) as session:
+        user = session.exec(select(Users).where(Users.telegram_id == tg_id)).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # get last ticket
+        # last_ticket = session.exec(
+        #     select(Tickets).order_by(Tickets.id.desc())
+        # ).first()
+
+        # last_ticket_data = None
+        # if last_ticket:
+        #     last_ticket_data = {
+        #         "id": last_ticket.id,
+        #         "number": last_ticket.number,
+        #         "type": last_ticket.type,
+        #         "user_id": last_ticket.user_id,
+        #         "timestamp": last_ticket.timestamp
+        #     }
+
+        return {
+            "id": user.id,
+            "name": user.name,
+            "dept_streak": user.dept_streak,
+            "telegram_id": user.telegram_id,
+            # "last_ticket": last_ticket_data
         }
