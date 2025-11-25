@@ -16,7 +16,7 @@ class Tickets(SQLModel, table=True):
     type: Optional[str] = None
     status: str = Field(default="queued")
     user_id: Optional[int] = Field(default=None, foreign_key="users.id")
-    timestamp: datetime.datetime = Field(default_factory=datetime.datetime)
+    timestamp: Optional[datetime.datetime] = Field(default_factory=None)
 
 
 class Logs(SQLModel, table=True):
