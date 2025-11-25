@@ -6,7 +6,7 @@ import datetime
 class Users(SQLModel, table=True):
     id: int = Field(default=None, primary_key=True)
     name: str
-    is_frozen: bool = False
+    dept_streak: int = Field(default=0)
     telegram_id: Optional[int] = None
 
 

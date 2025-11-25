@@ -1,6 +1,9 @@
 # TODO:
 # - Add date check so people can't book tickets for wierd dates
 # - add more checks or validations
+# - check time and date for tickets so there won't be multiple tickets at same time (exploit)
+# - check type of ticket if it's valid
+# - redo status
 
 
 import time
@@ -48,26 +51,12 @@ def create_user(user: Users):
         session.refresh(user)
         return user
 
-# @app.get("/users/")
-# def read_users():
-#     with Session(engine) as session:
-#         users = session.exec(select(Users)).all()
-#         return users
-
 
 @app.get("/tickets/")
 def read_tickets():
     with Session(engine) as session:
         tickets = session.exec(select(Tickets)).all()
         return tickets
-    
-# @app.post("/tickets/")
-# def create_ticket(ticket: Tickets):
-#     with Session(engine) as session:
-#         session.add(ticket)
-#         session.commit()
-#         session.refresh(ticket)
-#         return ticket
     
 
 # return next two fridays from today
@@ -107,15 +96,59 @@ def available_tickets(date: str, type: str):
     
 
 # book ticket, example: /book_ticket/1&dept&2024-07-12T12:42:20
-@app.post("/book_ticket/{user_id}&{type}&{timestamp}")
+@app.post("/book_ticket/{user_id}&{type}&{timestamp}") 
 def book_ticket(user_id: int, type: str, timestamp: datetime.datetime):
     with Session(engine) as session:
-        ticket = Tickets(type=type, user_id=user_id, timestamp=timestamp)
+        existing = session.exec(
+            select(Tickets).where(Tickets.user_id == user_id)
+        ).all()
+
+        # count by type
+        count_dept = sum(1 for t in existing if t.type == "dept")
+
+        # streak check: if user already has dept_streak >= 2 and was the last to take dept, block
+        if type == "dept" and user_id == session.exec(
+            select(Tickets.user_id).where(Tickets.type == "dept").order_by(Tickets.timestamp.desc())
+        ).first() and session.get(Users, user_id).dept_streak >= 2:
+            raise HTTPException(status_code=400, detail="Cannot take dept ticket consecutively more than twice")
+
+        if type == "dept":
+            frozen_users = session.exec(select(Users).where(Users.dept_streak >= 2)).all()
+            for u in frozen_users:
+                u.dept_streak = 0
+                session.add(u)
+            session.commit()
+
+        # only 5 dept allowed total
+        if type == "dept" and count_dept >= 5:
+            raise HTTPException(status_code=400, detail="Max dept tickets reached")
+
+        # only 1 ticket for non-dept types
+        if type != "dept" and any(t.type == type for t in existing):
+            raise HTTPException(status_code=400, detail="Already has one ticket of this type")
+        
+        last_ticket = session.exec(
+            select(Tickets).order_by(Tickets.number.desc())
+        ).first()
+        if last_ticket:
+            ticket_number = int(last_ticket.number) + 1
+        else:
+            ticket_number = 1
+        ticket_number = str(ticket_number).zfill(4)
+
+        ticket = Tickets(number=ticket_number, type=type, user_id=user_id, timestamp=timestamp)
         session.add(ticket)
         session.commit()
         session.refresh(ticket)
+
+        if type == "dept":
+            u = session.get(Users, user_id)
+            u.dept_streak += 1
+            session.add(u)
+            session.commit()
+
         return ticket
-    
+
 
 # cancel
 @app.post("/cancel_ticket/{ticket_id}")
@@ -130,10 +163,24 @@ def cancel_ticket(ticket_id: int):
 
 
 # check own tickets
-@app.get("/use_tickets/{user_id}")
-def use_tickets(user_id: int):
+@app.get("/user/{user_id}/tickets")
+def user_tickets(user_id: int):
     with Session(engine) as session:
         tickets = session.exec(
             select(Tickets).where(Tickets.user_id == user_id)
         ).all()
         return tickets
+    
+
+@app.get("/user/{user_id}/")
+def user_status(user_id: int):
+    with Session(engine) as session:
+        user = session.get(Users, user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        return {
+            "id": user.id,
+            "name": user.name,
+            "dept_streak": user.dept_streak,
+            "telegram_id": user.telegram_id
+        }
