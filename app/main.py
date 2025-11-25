@@ -42,7 +42,18 @@ def on_startup():
 
 # --- Validation middlewares -----------------------
 
-# TODO: 
+def validate_tg_user(user_id: int):
+    with Session(engine) as session:
+        user = session.exec(select(Users).where(Users.telegram_id == user_id)).first()
+        if not user:
+            # создаём нового пользователя с TG ID
+            user = Users(name=f"TG_{user_id}", telegram_id=user_id)
+            session.add(user)
+            session.commit()
+            session.refresh(user)
+        return user
+
+# TODO: validation middleware
 # @app.middleware("http")
 # async def verify_source(request: Request, call_next):
 #     if request.url.path.startswith("/book_ticket"):
@@ -77,23 +88,6 @@ def validate_ticket_timestamp(timestamp: datetime.datetime):
         raise HTTPException(status_code=400, detail="Ticket must be booked on a 10-minute slot")
 
 # --- Requests ---------------------------------------
-
-# TODO: remomve
-@app.post("/users/")
-def create_user(user: Users):
-    with Session(engine) as session:
-        session.add(user)
-        session.commit()
-        session.refresh(user)
-        return user
-
-
-@app.get("/tickets/")
-def read_tickets():
-    with Session(engine) as session:
-        tickets = session.exec(select(Tickets)).all()
-        return tickets
-    
 
 # return next two fridays from today
 @app.get("/get_fridays/")
@@ -163,10 +157,9 @@ def available_tickets(date: str, type: str):
             )
         ).all()
         return tickets
-    
-# book ticket, example: /book_ticket/1&dept&2024-07-12T12:42:20
-@app.post("/book_ticket/{user_id}&{type}&{timestamp}")  # TODO: add timestamp (10 minutes + fridays) validation
-# def book_ticket(user_id: int, type: str, timestamp: datetime):
+
+# book ticket, example: /ticket/book/1&dept&2024-07-12T12:42:20
+@app.post("/ticket/book/{user_id}&{type}&{timestamp}")  # TODO: add timestamp (10 minutes + fridays) validation
 def book_ticket(user_id: int, type: str, timestamp: datetime.datetime):
     validate_ticket_timestamp(timestamp)
     with Session(engine) as session:
@@ -235,7 +228,7 @@ def book_ticket(user_id: int, type: str, timestamp: datetime.datetime):
 
 
 # cancel
-@app.post("/cancel_ticket/{ticket_id}")
+@app.post("/ticket/cancel/{ticket_id}")
 def cancel_ticket(ticket_id: int):
     with Session(engine) as session:
         ticket = session.get(Tickets, ticket_id)
@@ -245,88 +238,41 @@ def cancel_ticket(ticket_id: int):
         session.commit()
         return {"detail": "Ticket canceled"}
 
-
-# check own tickets
-@app.get("/user/{user_id}/tickets")
-def user_tickets(user_id: int):
-    with Session(engine) as session:
-        tickets = session.exec(
-            select(Tickets).where(Tickets.user_id == user_id)
-        ).all()
-        return tickets
-
-@app.get("/tg/user/{tg_id}/tickets")
-def tg_user_tickets(tg_id: int):
-    with Session(engine) as session:
-        user = session.exec(select(Users).where(Users.telegram_id == tg_id)).first()
-        if not user:
-            # создаём нового пользователя с TG ID
-            user = Users(name=f"TG_{tg_id}", telegram_id=tg_id)
-            session.add(user)
-            session.commit()
-            session.refresh(user)
-
-        tickets = session.exec(select(Tickets).where(Tickets.user_id == user.id)).all()
-        return tickets
-
-
 # status
 @app.get("/user/{user_id}/status")
 def user_status(user_id: int):
     with Session(engine) as session:
-        user = session.get(Users, user_id)
+        user = session.exec(select(Users).where(Users.telegram_id == user_id)).first()
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
+        tickets = session.exec(select(Tickets).where(Tickets.user_id == user.id)).all()
 
-        # get last ticket
-        # last_ticket = session.exec(
-        #     select(Tickets).order_by(Tickets.id.desc())
-        # ).first()
-
-        # last_ticket_data = None
-        # if last_ticket:
-        #     last_ticket_data = {
-        #         "id": last_ticket.id,
-        #         "number": last_ticket.number,
-        #         "type": last_ticket.type,
-        #         "user_id": last_ticket.user_id,
-        #         "timestamp": last_ticket.timestamp
-        #     }
+        # TODO: get last queued ticket
+        
 
         return {
             "id": user.id,
             "name": user.name,
             "dept_streak": user.dept_streak,
             "telegram_id": user.telegram_id,
+            "tickets": tickets,
             # "last_ticket": last_ticket_data
         }
 
 @app.get("/tg/user/{user_id}/status")
-def tg_user_status(tg_id: int):
+def tg_user_status(user_id: int):
     with Session(engine) as session:
-        user = session.exec(select(Users).where(Users.telegram_id == tg_id)).first()
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
+        user = validate_tg_user(user_id)
+        tickets = session.exec(select(Tickets).where(Tickets.user_id == user.id)).all()
 
-        # get last ticket
-        # last_ticket = session.exec(
-        #     select(Tickets).order_by(Tickets.id.desc())
-        # ).first()
-
-        # last_ticket_data = None
-        # if last_ticket:
-        #     last_ticket_data = {
-        #         "id": last_ticket.id,
-        #         "number": last_ticket.number,
-        #         "type": last_ticket.type,
-        #         "user_id": last_ticket.user_id,
-        #         "timestamp": last_ticket.timestamp
-        #     }
+        # TODO: get last queued ticket
+        # last_ticket = 
 
         return {
             "id": user.id,
             "name": user.name,
             "dept_streak": user.dept_streak,
             "telegram_id": user.telegram_id,
+            "tickets": tickets,
             # "last_ticket": last_ticket_data
         }
