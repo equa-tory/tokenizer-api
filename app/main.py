@@ -260,11 +260,13 @@ def tg_user_tickets(tg_id: int):
     with Session(engine) as session:
         user = session.exec(select(Users).where(Users.telegram_id == tg_id)).first()
         if not user:
-            raise HTTPException(status_code=404, detail="User not found")
+            # создаём нового пользователя с TG ID
+            user = Users(name=f"TG_{tg_id}", telegram_id=tg_id)
+            session.add(user)
+            session.commit()
+            session.refresh(user)
 
-        tickets = session.exec(
-            select(Tickets).where(Tickets.user_id == user.id)
-        ).all()
+        tickets = session.exec(select(Tickets).where(Tickets.user_id == user.id)).all()
         return tickets
 
 
