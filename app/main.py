@@ -1,20 +1,17 @@
 # TODO:
 # - Add validation so random request countn't be used (only via *our systems*)
 # - create users in other way (not via API)
-# - use telegram id !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-# - change ticket number to "N-XXXX" format
-# - redo status last ticket
 
 
 import time
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from datetime import datetime, timedelta, time as dt_time
 from models import *
 from sqlalchemy import func
 
 
 
-valid_types = ["dept", "exam", "test", "diploma", "report"]
+valid_types = ["dept", "exam", "zachet", "diploma", "report"]
 
 DATABASE_URL = "postgresql://postgres:postgres@db:5432/fastapidb"
 engine = create_engine(DATABASE_URL, echo=True)
@@ -92,7 +89,6 @@ def validate_ticket_timestamp(timestamp: datetime.datetime):
 # return next two fridays from today
 @app.get("/get_fridays/")
 def get_fridays():
-
     today = datetime.datetime.now()
     fridays = []
     days_ahead = 4 - today.weekday()  # Friday is 4
@@ -146,7 +142,7 @@ def get_timeslots(friday_date: str):
 
 
 # list of avaliable tickets on date with type (date&type) format: YYYY-MM-DD&<type>
-@app.get("/available_tickets/{date}&{type}")
+@app.get("/ticket/check/{date}&{type}")
 def available_tickets(date: str, type: str):
     query_date = datetime.strptime(date, "%Y-%m-%d").date()
     with Session(engine) as session:
@@ -158,74 +154,117 @@ def available_tickets(date: str, type: str):
         ).all()
         return tickets
 
-# book ticket, example: /ticket/book/1&dept&2024-07-12T12:42:20
-@app.post("/ticket/book/{user_id}&{type}&{timestamp}")  # TODO: add timestamp (10 minutes + fridays) validation
-def book_ticket(user_id: int, type: str, timestamp: datetime.datetime):
-    validate_ticket_timestamp(timestamp)
-    with Session(engine) as session:
-        # duplicate timestamp check
-        existing = session.exec(
-            select(Tickets).where(Tickets.timestamp == timestamp)
-        ).first()
-        if existing:
-            raise HTTPException(status_code=400, detail="Ticket already booked for this time")
-        
-        # user existence check
-        user = session.get(Users, user_id)
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
+# book ticket, example: /ticket/book/?tg=1&dept&2024-07-12T12:42:20
+@app.post("/ticket/book")
+def book_ticket(
+    type: str = Query(...),
+    timestamp: datetime.datetime = Query(None),
+    id: int = Query(None),
+    tg: int = Query(None)
+):
+    # --- User ID selection ---
+    if id is None and tg is None:
+        raise HTTPException(status_code=400, detail="Provide ?id= or ?tg=")
 
-        # get existing tickets
+    with Session(engine) as session:
+        # TG user
+        if tg is not None:
+            user = session.exec(select(Users).where(Users.telegram_id == tg)).first()
+            if not user:
+                user = Users(name=f"TG_{tg}", telegram_id=tg)
+                session.add(user)
+                session.commit()
+                session.refresh(user)
+            user_id = user.id
+
+        # Normal user
+        else:
+            user = session.get(Users, id)
+            if not user:
+                raise HTTPException(status_code=404, detail="User not found")
+            user_id = user.id
+
+        # --- Validation ---
+        if type not in valid_types:
+            raise HTTPException(status_code=400, detail="Invalid ticket type")
+
+        # If dept — timestamp required
+        if type == "dept":
+            if timestamp is None:
+                raise HTTPException(status_code=400, detail="Timestamp is required for dept tickets")
+            validate_ticket_timestamp(timestamp)
+
+            existing_slot = session.exec(
+                select(Tickets).where(Tickets.timestamp == timestamp)
+            ).first()
+            if existing_slot:
+                raise HTTPException(status_code=400, detail="Slot already booked")
+
+        # --- Get existing tickets of user ---
         existing = session.exec(
             select(Tickets).where(Tickets.user_id == user_id)
         ).all()
 
-        # type check
-        if type not in valid_types:
-            raise HTTPException(status_code=400, detail="Invalid ticket type")
-
-        # count by type
-        count_dept = sum(1 for t in existing if t.type == "dept")
-
-        # streak check
-        last_dept_user_id = session.exec(
-            select(Tickets.user_id).where(Tickets.type == "dept").order_by(Tickets.timestamp.desc())
-        ).first()
-        if type == "dept" and last_dept_user_id == user_id and user.dept_streak >= 2:
-            raise HTTPException(status_code=400, detail="Cannot take dept ticket consecutively more than twice")
-
-        # reset dept_streak for frozen users
+        # Max 5 dept
         if type == "dept":
+            count_dept = sum(1 for t in existing if t.type == "dept")
+            if count_dept >= 5:
+                raise HTTPException(status_code=400, detail="Max dept tickets reached")
+
+            # consecutive check
+            last_dept_user_id = session.exec(
+                select(Tickets.user_id)
+                .where(Tickets.type == "dept")
+                .order_by(Tickets.timestamp.desc())
+            ).first()
+
+            if last_dept_user_id == user_id and user.dept_streak >= 2:
+                raise HTTPException(status_code=400, detail="Cannot take dept more than twice in a row")
+
+            # unfreeze all if someone else takes dept
             frozen_users = session.exec(select(Users).where(Users.dept_streak >= 2)).all()
             for u in frozen_users:
                 u.dept_streak = 0
                 session.add(u)
 
-        # max 5 dept tickets
-        if type == "dept" and count_dept >= 5:
-            raise HTTPException(status_code=400, detail="Max dept tickets reached")
-
-        # only 1 ticket for non-dept types
+        # Non-dept: only 1 ticket
         if type != "dept" and any(t.type == type for t in existing):
             raise HTTPException(status_code=400, detail="Already has one ticket of this type")
-        
+
+        # --- Ticket numbering ---
         last_ticket = session.exec(
             select(Tickets).order_by(Tickets.number.desc())
         ).first()
-        ticket_number = str(int(last_ticket.number)+1 if last_ticket else 1).zfill(4)
+       
+        # --- Ticket numbering with prefix ---
+        prefix_map = {
+            "exam": "Э",
+            "zachet": "Ё",
+            "dept": "З",
+            "diploma": "Д",
+            "report": "О"
+        }
+        last_number_int = int(last_ticket.number[1:]) if last_ticket else 0
+        ticket_number = f"{prefix_map[type]}-{str(last_number_int + 1).zfill(4)}"
+       
+        # --- Create ticket ---
+        ticket = Tickets(
+            number=ticket_number,
+            type=type,
+            user_id=user_id,
+            timestamp=timestamp if timestamp else datetime.datetime.now()
+        )
 
-        ticket = Tickets(number=ticket_number, type=type, user_id=user_id, timestamp=timestamp)
         session.add(ticket)
 
-        # increment dept_streak if needed
         if type == "dept":
             user.dept_streak += 1
             session.add(user)
 
         session.commit()
         session.refresh(ticket)
-        return ticket
 
+        return ticket
 
 # cancel
 @app.post("/ticket/cancel/{ticket_id}")
@@ -239,16 +278,38 @@ def cancel_ticket(ticket_id: int):
         return {"detail": "Ticket canceled"}
 
 # status
-@app.get("/user/{user_id}/status")
-def user_status(user_id: int):
-    with Session(engine) as session:
-        user = session.exec(select(Users).where(Users.telegram_id == user_id)).first()
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
-        tickets = session.exec(select(Tickets).where(Tickets.user_id == user.id)).all()
+@app.get("/status")
+def status(id: int = Query(None), tg: int = Query(None)):
+    if id is None and tg is None:
+        raise HTTPException(status_code=400, detail="Provide ?id= or ?tg=")
 
-        # TODO: get last queued ticket
-        
+    with Session(engine) as session:
+        # ---- TG user ----
+        if tg is not None:
+            user = session.exec(select(Users).where(Users.telegram_id == tg)).first()
+            if not user:
+                user = Users(name=f"TG_{tg}", telegram_id=tg)
+                session.add(user)
+                session.commit()
+                session.refresh(user)
+
+        # ---- Normal user ----
+        else:
+            user = session.get(Users, id)
+            if not user:
+                raise HTTPException(status_code=404, detail="User not found")
+
+        # ---- Get tickets ----
+        tickets = session.exec(
+            select(Tickets).where(Tickets.user_id == user.id)
+        ).all()
+
+        # ---- Last queued ticket ----
+        last_ticket = session.exec(
+            select(Tickets)
+            .where(Tickets.user_id == user.id)
+            .order_by(Tickets.timestamp.desc())
+        ).first()
 
         return {
             "id": user.id,
@@ -256,23 +317,5 @@ def user_status(user_id: int):
             "dept_streak": user.dept_streak,
             "telegram_id": user.telegram_id,
             "tickets": tickets,
-            # "last_ticket": last_ticket_data
-        }
-
-@app.get("/tg/user/{user_id}/status")
-def tg_user_status(user_id: int):
-    with Session(engine) as session:
-        user = validate_tg_user(user_id)
-        tickets = session.exec(select(Tickets).where(Tickets.user_id == user.id)).all()
-
-        # TODO: get last queued ticket
-        # last_ticket = 
-
-        return {
-            "id": user.id,
-            "name": user.name,
-            "dept_streak": user.dept_streak,
-            "telegram_id": user.telegram_id,
-            "tickets": tickets,
-            # "last_ticket": last_ticket_data
+            "last_ticket": last_ticket
         }
