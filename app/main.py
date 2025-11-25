@@ -12,7 +12,7 @@ from sqlalchemy import func
 
 
 valid_types = {
-    "debt": "Сдача задолженностей",
+    "debt": "Сдача задолженностей", # !!! keep this line like that, required by telegram bot logic !!!
     "exam": "Сдача экзамена",
     "zachet": "Сдача зачёта",
     "report": "Сдача отчёта",
@@ -169,7 +169,7 @@ def available_tickets(date: str, type: str):
         ).all()
         return tickets
 
-# book ticket, example: /ticket/book/?tg=1&dept&2024-07-12T12:42:20
+# book ticket, example: /ticket/book/?tg=1&debt&2024-07-12T12:42:20
 @app.post("/ticket/book")
 def book_ticket(
     type: str = Query(...),
@@ -203,8 +203,8 @@ def book_ticket(
         if type not in valid_types.keys():
             raise HTTPException(status_code=400, detail="Неверный тип билета")
 
-        # If dept — timestamp required
-        if type == "dept":
+        # If debt — timestamp required
+        if type == "debt":
             if timestamp is None:
                 raise HTTPException(status_code=400, detail="Требуется время для задолженности")
             validate_ticket_timestamp(timestamp)
@@ -220,30 +220,30 @@ def book_ticket(
             select(Tickets).where(Tickets.user_id == user_id)
         ).all()
 
-        # Max 5 dept
-        if type == "dept":
-            count_dept = sum(1 for t in existing if t.type == "dept")
-            if count_dept >= 5:
+        # Max 5 debt
+        if type == "debt":
+            count_debt = sum(1 for t in existing if t.type == "debt")
+            if count_debt >= 5:
                 raise HTTPException(status_code=400, detail="Максимум задолженностей достигнут")
 
             # consecutive check
-            last_dept_user_id = session.exec(
+            last_debt_user_id = session.exec(
                 select(Tickets.user_id)
-                .where(Tickets.type == "dept")
+                .where(Tickets.type == "debt")
                 .order_by(Tickets.timestamp.desc())
             ).first()
 
-            if last_dept_user_id == user_id and user.dept_streak >= 2:
+            if last_debt_user_id == user_id and user.debt_streak >= 2:
                 raise HTTPException(status_code=400, detail="Нельзя брать задолженность более двух раз подряд")
 
-            # unfreeze all if someone else takes dept
-            frozen_users = session.exec(select(Users).where(Users.dept_streak >= 2)).all()
+            # unfreeze all if someone else takes debt
+            frozen_users = session.exec(select(Users).where(Users.debt_streak >= 2)).all()
             for u in frozen_users:
-                u.dept_streak = 0
+                u.debt_streak = 0
                 session.add(u)
 
-        # Non-dept: only 1 ticket
-        if type != "dept" and any(t.type == type for t in existing):
+        # Non-debt: only 1 ticket
+        if type != "debt" and any(t.type == type for t in existing):
             raise HTTPException(status_code=400, detail="Уже есть билет этого типа")
 
         # --- Ticket numbering ---
@@ -255,7 +255,7 @@ def book_ticket(
         prefix_map = {
             "exam": "Э",
             "zachet": "Ё",
-            "dept": "З",
+            "debt": "З",
             "diploma": "Д",
             "report": "О"
         }
@@ -272,8 +272,8 @@ def book_ticket(
 
         session.add(ticket)
 
-        if type == "dept":
-            user.dept_streak += 1
+        if type == "debt":
+            user.debt_streak += 1
             session.add(user)
 
         session.commit()
@@ -329,7 +329,7 @@ def status(id: int = Query(None), tg: int = Query(None)):
         return {
             "id": user.id,
             "name": user.name,
-            "dept_streak": user.dept_streak,
+            "debt_streak": user.debt_streak,
             "telegram_id": user.telegram_id,
             "tickets": tickets,
             "last_ticket": last_ticket
