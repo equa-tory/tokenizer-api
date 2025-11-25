@@ -255,7 +255,7 @@ def user_tickets(user_id: int):
         ).all()
         return tickets
 
-@app.get("/tg/user/{user_id}/tickets")
+@app.get("/tg/user/{tg_id}/tickets")
 def tg_user_tickets(tg_id: int):
     with Session(engine) as session:
         user = session.exec(select(Users).where(Users.telegram_id == tg_id)).first()
