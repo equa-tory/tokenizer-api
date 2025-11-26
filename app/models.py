@@ -1,4 +1,4 @@
-from sqlmodel import SQLModel, Field, Session, create_engine, select
+from sqlmodel import SQLModel, Field, Session, create_engine, select, BigInteger, Column
 from typing import Optional
 import datetime
 
@@ -7,7 +7,7 @@ class Users(SQLModel, table=True):
     id: int = Field(default=None, primary_key=True)
     name: str
     debt_streak: int = Field(default=0)
-    telegram_id: Optional[int] = None
+    telegram_id: Optional[int] = Field(default=None, sa_column=Column(BigInteger))
 
 
 class Tickets(SQLModel, table=True):

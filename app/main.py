@@ -17,6 +17,7 @@ valid_types = {
     "zachet": "Сдача зачёта",
     "report": "Сдача отчёта",
     "diploma": "Сдача диплома",
+    "diploma2": "Сдача денег",
 }
 
 DATABASE_URL = "postgresql://postgres:postgres@db:5432/fastapidb"
@@ -246,21 +247,23 @@ def book_ticket(
         if type != "debt" and any(t.type == type for t in existing):
             raise HTTPException(status_code=400, detail="Уже есть билет этого типа")
 
-        # --- Ticket numbering ---
-        last_ticket = session.exec(
-            select(Tickets).order_by(Tickets.number.desc())
-        ).first()
-       
         # --- Ticket numbering with prefix ---
-        prefix_map = {
-            "exam": "Э",
-            "zachet": "Ё",
-            "debt": "З",
-            "diploma": "Д",
-            "report": "О"
-        }
-        last_number_int = int(last_ticket.number[1:]) if last_ticket else 0
-        ticket_number = f"{prefix_map[type]}-{str(last_number_int + 1).zfill(4)}"
+        if type == "zachet":
+            prefix = "Ë"
+        else:
+            # Берём первую букву последнего слова
+            last_word = valid_types[type].split()[-1]
+            prefix = last_word[0].upper()
+
+        # Получаем последний билет только для этого префикса
+        last_ticket = session.exec(
+            select(Tickets)
+            .where(Tickets.number.like(f"{prefix}-%"))
+            .order_by(Tickets.number.desc())
+        ).first()
+
+        last_number_int = int(last_ticket.number.split("-")[1]) if last_ticket else 0
+        ticket_number = f"{prefix}-{str(last_number_int + 1).zfill(4)}"
        
         # --- Create ticket ---
         ticket = Tickets(
