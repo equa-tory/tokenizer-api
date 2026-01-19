@@ -1,27 +1,62 @@
-from sqlmodel import SQLModel, Field, Session, create_engine, select, BigInteger, Column
+from sqlalchemy import Column, Integer, String, ForeignKey, Date, Time, DateTime, Table
+from sqlalchemy.orm import relationship, declarative_base
+from datetime import datetime
 from typing import Optional
-import datetime
+
+Base = declarative_base()
+
+# Промежуточная таблица для связи Course <-> TicketType
+course_tickettype = Table(
+    "course_tickettype",
+    Base.metadata,
+    Column("course_id", Integer, ForeignKey("courses.id"), primary_key=True),
+    Column("tickettype_id", Integer, ForeignKey("tickettypes.id"), primary_key=True)
+)
+
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True, index=True)
+    tg_id: Optional[str] = Column(String, unique=True, nullable=True)
+    name = Column(String, nullable=False)
+
+    tickets = relationship("Ticket", back_populates="user")
+    course_id = Column(Integer, ForeignKey("courses.id"))
+    course = relationship("Course", back_populates="users")
 
 
-class Users(SQLModel, table=True):
-    id: int = Field(default=None, primary_key=True)
-    name: str
-    debt_streak: int = Field(default=0)
-    telegram_id: Optional[int] = Field(default=None, sa_column=Column(BigInteger))
+class TicketType(Base):
+    __tablename__ = "tickettypes"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    max_per_user = Column(Integer, nullable=False)
+    require_time = Column(Integer, nullable=True)  # В минутах или часах
+
+    courses = relationship("Course", secondary=course_tickettype, back_populates="ticket_types")
+    tickets = relationship("Ticket", back_populates="ticket_type")
 
 
-class Tickets(SQLModel, table=True):
-    id: int = Field(default=None, primary_key=True)
-    number: str = Field(default="?-XXXX", max_length=6)
-    type: Optional[str] = None
-    status: str = Field(default="queued")
-    user_id: Optional[int] = Field(default=None, foreign_key="users.id")
-    timestamp: Optional[datetime.datetime] = Field(default_factory=None)
+class Course(Base):
+    __tablename__ = "courses"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    weekday = Column(Integer, nullable=False)
+    start_time = Column(Time, nullable=False)
+    end_time = Column(Time, nullable=False)
+    slot_range = Column(Integer, nullable=False)
+
+    ticket_types = relationship("TicketType", secondary=course_tickettype, back_populates="courses")
+    users = relationship("User", back_populates="course")
 
 
-class Logs(SQLModel, table=True):
-    id: int = Field(default=None, primary_key=True)
-    action: str
-    user_id: Optional[int] = Field(default=None, foreign_key="users.id")
-    ticket_id: Optional[int] = Field(default=None, foreign_key="tickets.id")
-    timestamp: datetime.datetime = Field(default_factory=datetime.datetime)
+class Ticket(Base):
+    __tablename__ = "tickets"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    status = Column(String, nullable=False)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+
+    user_id = Column(Integer, ForeignKey("users.id"))
+    user = relationship("User", back_populates="tickets")
+
+    ticket_type_id = Column(Integer, ForeignKey("tickettypes.id"))
+    ticket_type = relationship("TicketType", back_populates="tickets")

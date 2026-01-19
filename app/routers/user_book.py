@@ -1,0 +1,28 @@
+import datetime
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from app.models import Course, Ticket
+from app.db import get_db
+from datetime import datetime, timedelta, time as dt_time
+
+router = APIRouter()
+
+@router.get("/{course_id}/{date}")
+def get_timeslots(course_id: int, date: str, db: Session = Depends(get_db)):
+    course = db.query(Course).get(course_id)
+    if not course:
+        raise HTTPException(404)
+    
+    if course.weekday != datetime.strptime(date, "%Y-%m-%d").weekday():
+        raise HTTPException(400)
+
+    query_date = datetime.strptime(date, "%Y-%m-%d").date()
+    start_time = datetime.combine(query_date, dt_time(16,0))
+    end_time = datetime.combine(query_date, dt_time(18,0))
+    slots = []
+    current = start_time
+    while current < end_time:
+        taken = db.query(Ticket).filter(Ticket.timestamp == current).first()
+        slots.append({"time": current.time().strftime("%H:%M"), "available": not bool(taken)})
+        current += timedelta(minutes=10)
+    return {"timeslots": slots}

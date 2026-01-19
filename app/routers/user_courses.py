@@ -1,0 +1,19 @@
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from app.models import Course
+from app.db import get_db
+
+router = APIRouter()
+
+@router.get("/{course_id}")
+def get_valid_types(course_id: int, db: Session = Depends(get_db)):
+    course = db.query(Course).get(course_id)
+    if not course:
+        raise HTTPException(404)
+
+    return {
+        "valid_types": [
+            {"id": tt.id, "name": tt.name}
+            for tt in course.ticket_types
+        ]
+    }
