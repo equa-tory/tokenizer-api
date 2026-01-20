@@ -1,3 +1,4 @@
+# normal
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.models import Course
@@ -5,7 +6,7 @@ from app.db import get_db
 
 router = APIRouter()
 
-@router.get("/{course_id}")
+@router.get("/")
 def get_valid_types(course_id: int, db: Session = Depends(get_db)):
     course = db.query(Course).get(course_id)
     if not course:

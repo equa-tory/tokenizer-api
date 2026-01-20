@@ -1,28 +1,46 @@
-import datetime
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from app.models import Course, Ticket
+from app.models import Course, Ticket, TicketType, User
 from app.db import get_db
-from datetime import datetime, timedelta, time as dt_time
+from datetime import datetime
+from sqlalchemy import select
+from logic import get_user, check_ticket_rules, generate_ticket_number
 
 router = APIRouter()
 
-@router.get("/{course_id}/{date}")
-def get_timeslots(course_id: int, date: str, db: Session = Depends(get_db)):
-    course = db.query(Course).get(course_id)
-    if not course:
-        raise HTTPException(404)
-    
-    if course.weekday != datetime.strptime(date, "%Y-%m-%d").weekday():
-        raise HTTPException(400)
 
-    query_date = datetime.strptime(date, "%Y-%m-%d").date()
-    start_time = datetime.combine(query_date, dt_time(16,0))
-    end_time = datetime.combine(query_date, dt_time(18,0))
-    slots = []
-    current = start_time
-    while current < end_time:
-        taken = db.query(Ticket).filter(Ticket.timestamp == current).first()
-        slots.append({"time": current.time().strftime("%H:%M"), "available": not bool(taken)})
-        current += timedelta(minutes=10)
-    return {"timeslots": slots}
+@router.post("/")
+def book_ticket(
+    type: str = Query(...),
+    timestamp: datetime = Query(...),
+    id: int = Query(...),
+    tg: int = Query(None),
+    db: Session = Depends(get_db)
+):
+    user = get_user(id=id, tg=tg, db=db)
+    check_ticket_rules(user, type, timestamp, db) # TODO: add timestamp checks
+    ticket_number = generate_ticket_number(type, db) # TODO: fix number
+
+    ticket_type_obj = db.execute(
+        select(TicketType).where(TicketType.name == type)
+    ).scalar_one_or_none()
+
+    if not ticket_type_obj:
+        raise HTTPException(status_code=404, detail="Тип билета не найден")
+
+    ticket = Ticket(
+        name=ticket_number,
+        status="active", # TODO: add logic
+        ticket_type=ticket_type_obj,
+        user_id=user.id,
+        timestamp=timestamp
+    )
+
+    db.add(ticket)
+    if type == db.execute(select(TicketType.name)).scalars().first(): # if "debt"
+        user.debt_streak += 1
+        db.add(user)
+    db.commit()
+    db.refresh(ticket)
+
+    return ticket

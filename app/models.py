@@ -22,14 +22,17 @@ class User(Base):
     tickets = relationship("Ticket", back_populates="user")
     course_id = Column(Integer, ForeignKey("courses.id"))
     course = relationship("Course", back_populates="users")
+    debt_streak = Column(Integer, default=0)
 
 
 class TicketType(Base):
     __tablename__ = "tickettypes"
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
+    title = Column(String, nullable=True)
     max_per_user = Column(Integer, nullable=False)
     require_time = Column(Integer, nullable=True)  # В минутах или часах
+    symbol = Column(String(1), nullable=True)
 
     courses = relationship("Course", secondary=course_tickettype, back_populates="ticket_types")
     tickets = relationship("Ticket", back_populates="ticket_type")

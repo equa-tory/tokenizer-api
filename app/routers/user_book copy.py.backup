@@ -5,11 +5,13 @@ from app.db import get_db
 from datetime import datetime
 from sqlalchemy import select
 
-from models import *
-from db import engine
+router = APIRouter()
 
-
-
+VALID_TYPES = {
+    "zachet": "Зачёт",
+    "debt": "Задолженность",
+    # добавь остальные типы
+}
 
 def get_user(id: int = None, tg: int = None, db: Session = Depends(get_db)):
     if not id and not tg:
@@ -18,6 +20,10 @@ def get_user(id: int = None, tg: int = None, db: Session = Depends(get_db)):
         user = db.execute(select(User).where(User.tg_id == tg)).scalar_one_or_none()
         if not user:
             raise HTTPException(status_code=404, detail="TG Пользователь не найден")
+        #     user = User(name=f"TG_{tg}", telegram_id=tg)
+        #     db.add(user)
+        #     db.commit()
+        #     db.refresh(user)        
 
     else:
         user = db.get(User, id)
@@ -26,12 +32,12 @@ def get_user(id: int = None, tg: int = None, db: Session = Depends(get_db)):
     return user
 
 def check_ticket_rules(user: User, ticket_type: str, timestamp: datetime, db: Session):
-    if ticket_type not in db.execute(select(TicketType.name)).scalars().all():
+    if ticket_type not in VALID_TYPES:
         raise HTTPException(status_code=400, detail="Неверный тип билета")
 
     existing_tickets = db.execute(select(Ticket).where(Ticket.user_id == user.id)).scalars().all()
 
-    if ticket_type == db.execute(select(TicketType.name)).scalars().first(): # if "debt"
+    if ticket_type == "debt":
         if not timestamp:
             raise HTTPException(status_code=400, detail="Требуется время для задолженности")
         # check if timestamp is taken
@@ -43,7 +49,7 @@ def check_ticket_rules(user: User, ticket_type: str, timestamp: datetime, db: Se
             raise HTTPException(status_code=400, detail="Уже есть билет на это время")
         
 
-        count_debt = sum(1 for t in existing_tickets if t.ticket_type == "debt") # TODO: fix
+        count_debt = sum(1 for t in existing_tickets if t.ticket_type == "debt")
         if count_debt >= 5:
             raise HTTPException(status_code=400, detail="Максимум задолженностей достигнут")
 
@@ -68,7 +74,11 @@ def check_ticket_rules(user: User, ticket_type: str, timestamp: datetime, db: Se
             raise HTTPException(status_code=400, detail="Уже есть билет этого типа")
 
 def generate_ticket_number(ticket_type: str, db: Session):
-    prefix = db.execute(select(TicketType.symbol).where(TicketType.name == ticket_type)).scalar_one_or_none()
+    if ticket_type == "zachet":
+        prefix = "Ë"
+    else:
+        last_word = VALID_TYPES[ticket_type].split()[-1]
+        prefix = last_word[0].upper()
 
     last_ticket = db.execute(
         select(Ticket)
@@ -79,3 +89,39 @@ def generate_ticket_number(ticket_type: str, db: Session):
 
     last_number = int(last_ticket.name.split("-")[1]) if last_ticket else 0
     return f"{prefix}-{str(last_number + 1).zfill(4)}"
+
+@router.post("/")
+def book_ticket(
+    type: str = Query(...),
+    timestamp: datetime = Query(None),
+    id: int = Query(None),
+    tg: int = Query(None),
+    db: Session = Depends(get_db)
+):
+    user = get_user(id=id, tg=tg, db=db)
+    check_ticket_rules(user, type, timestamp, db)
+    ticket_number = generate_ticket_number(type, db)
+
+    ticket_type_obj = db.execute(
+        select(TicketType).where(TicketType.name == type)
+    ).scalar_one_or_none()
+
+    if not ticket_type_obj:
+        raise HTTPException(status_code=404, detail="Тип билета не найден")
+
+    ticket = Ticket(
+        name=ticket_number,
+        status="active", # TODO: add logic
+        ticket_type=ticket_type_obj,
+        user_id=user.id,
+        timestamp=timestamp
+    )
+
+    db.add(ticket)
+    if type == "debt":
+        user.debt_streak += 1
+        db.add(user)
+    db.commit()
+    db.refresh(ticket)
+
+    return ticket

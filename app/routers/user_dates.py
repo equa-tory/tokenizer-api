@@ -6,7 +6,7 @@ from app.db import get_db
 
 router = APIRouter()
 
-@router.get("/{course_id}")
+@router.get("/")
 def get_days(course_id: int, db: Session = Depends(get_db)):
     course = db.query(Course).get(course_id)
     if not course:
@@ -14,7 +14,7 @@ def get_days(course_id: int, db: Session = Depends(get_db)):
 
     today = datetime.datetime.now().date()
     days_ahead = (course.weekday - today.weekday()) % 7
-    if days_ahead == 0 and datetime.datetime.now().time() >= datetime.time(16,0):
+    if days_ahead == 0 and datetime.datetime.now().time() >= course.start_time:
         days_ahead = 7
     first_friday = today + datetime.timedelta(days=days_ahead)
     second_friday = first_friday + datetime.timedelta(days=7)
