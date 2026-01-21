@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app.models import Course, Ticket, TicketType, User
+from typing import Optional
 from app.db import get_db
 from datetime import datetime
 from sqlalchemy import select
@@ -12,14 +13,14 @@ router = APIRouter()
 @router.post("/")
 def book_ticket(
     type: str = Query(...),
-    timestamp: datetime = Query(...),
+    timestamp: Optional[datetime] = None,
     id: int = Query(...),
     tg: int = Query(None),
     db: Session = Depends(get_db)
 ):
     user = get_user(id=id, tg=tg, db=db)
-    check_ticket_rules(user, type, timestamp, db) # TODO: add timestamp checks
-    ticket_number = generate_ticket_number(type, db) # TODO: fix number
+    check_ticket_rules(user, type, timestamp, db)
+    ticket_number = generate_ticket_number(type, db)
 
     ticket_type_obj = db.execute(
         select(TicketType).where(TicketType.name == type)
@@ -30,10 +31,10 @@ def book_ticket(
 
     ticket = Ticket(
         name=ticket_number,
-        status="active", # TODO: add logic
-        ticket_type=ticket_type_obj,
+        status="active",
+        ticket_type_id=ticket_type_obj.id,
         user_id=user.id,
-        timestamp=timestamp
+        timestamp=timestamp if ticket_type_obj.require_time else None,
     )
 
     db.add(ticket)

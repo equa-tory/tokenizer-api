@@ -56,7 +56,8 @@ class Ticket(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
     status = Column(String, nullable=False)
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
     user_id = Column(Integer, ForeignKey("users.id"))
     user = relationship("User", back_populates="tickets")

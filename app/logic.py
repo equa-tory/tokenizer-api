@@ -10,7 +10,6 @@ from db import engine
 
 
 
-
 def get_user(id: int = None, tg: int = None, db: Session = Depends(get_db)):
     if not id and not tg:
         raise HTTPException(status_code=400, detail="Provide ?id= or ?tg=")
@@ -25,54 +24,102 @@ def get_user(id: int = None, tg: int = None, db: Session = Depends(get_db)):
             raise HTTPException(status_code=404, detail="Пользователь не найден")
     return user
 
-def check_ticket_rules(user: User, ticket_type: str, timestamp: datetime, db: Session):
-    if ticket_type not in db.execute(select(TicketType.name)).scalars().all():
+
+
+def check_ticket_rules(user: User, ticket_type: str, timestamp: datetime | None, db: Session):
+    tt = db.execute(
+        select(TicketType).where(TicketType.name == ticket_type)
+    ).scalar_one_or_none()
+
+    if not tt:
         raise HTTPException(status_code=400, detail="Неверный тип билета")
 
-    existing_tickets = db.execute(select(Ticket).where(Ticket.user_id == user.id)).scalars().all()
+    # --- timestamp check logic ---
+    # TODO:
+    # 1. check if timestamp is taken
+    # 2. check if timestamp is in the future
+    # 3. check if timestamp is in right dates and time slots
 
-    if ticket_type == db.execute(select(TicketType.name)).scalars().first(): # if "debt"
+    # get last ticket and check if 10 minutes have passed
+    last_ticket = db.execute(
+        select(Ticket)
+        .order_by(Ticket.timestamp.desc())
+        .limit(1)
+    ).scalar_one_or_none()
+
+    if last_ticket:
+        from datetime import datetime, timedelta
+        now = datetime.utcnow()
+        cooldown = 10  # minutes # TODO: config cooldown
+        if last_ticket.timestamp and (now - last_ticket.timestamp) < timedelta(minutes=cooldown):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Подождите минимум {cooldown} минут перед созданием нового билета"
+            )
+
+
+
+    # --- require_time logic ---
+    if tt.require_time and tt.require_time > 0:
         if not timestamp:
-            raise HTTPException(status_code=400, detail="Требуется время для задолженности")
-        # check if timestamp is taken
-        existing_timestamps = db.execute(
-            select(Ticket.timestamp)
-            .where(Ticket.timestamp == timestamp)
-        ).scalars().all()
-        if existing_timestamps:
-            raise HTTPException(status_code=400, detail="Уже есть билет на это время")
-        
+            raise HTTPException(status_code=400, detail="Для этого типа билета требуется время")
 
-        count_debt = sum(1 for t in existing_tickets if t.ticket_type == "debt") # TODO: fix
-        if count_debt >= 5:
-            raise HTTPException(status_code=400, detail="Максимум задолженностей достигнут")
+        # timestamp uniqueness (global)
+        exists = db.execute(
+            select(Ticket.id).where(Ticket.timestamp == timestamp)
+        ).scalar_one_or_none()
+        if exists:
+            raise HTTPException(status_code=400, detail="Это время уже занято")
+    else:
+        # timestamp must be ignored completely
+        timestamp = None
 
+    # --- max_per_user logic ---
+    user_tickets_of_type = db.execute(
+        select(Ticket)
+        .where(
+            Ticket.user_id == user.id,
+            Ticket.ticket_type_id == tt.id,
+            Ticket.status == "active",
+        )
+    ).scalars().all()
+
+    if tt.max_per_user is not None and len(user_tickets_of_type) >= tt.max_per_user:
+        raise HTTPException(
+            status_code=400,
+            detail="Достигнут лимит билетов этого типа"
+        )
+
+    # --- debt-specific logic (kept but simplified) ---
+    if tt.name == "debt":
         last_debt_user_id = db.execute(
             select(Ticket.user_id)
-            .where(Ticket.ticket_type.has(name="debt"))
+            .where(Ticket.ticket_type_id == tt.id)
             .order_by(Ticket.timestamp.desc())
             .limit(1)
         ).scalar_one_or_none()
 
         if last_debt_user_id == user.id and user.debt_streak >= 2:
-            raise HTTPException(status_code=400, detail="Нельзя брать задолженность более двух раз подряд")
+            raise HTTPException(
+                status_code=400,
+                detail="Нельзя брать задолженность более двух раз подряд"
+            )
 
-        # Сброс долговой цепочки у других
-        frozen_users = db.execute(select(User).where(User.debt_streak >= 2)).scalars().all()
-        for u in frozen_users:
+        # reset streaks for others
+        others = db.execute(
+            select(User).where(User.id != user.id, User.debt_streak >= 2)
+        ).scalars().all()
+
+        for u in others:
             u.debt_streak = 0
             db.add(u)
-
-    else:
-        if any(t.name == ticket_type for t in existing_tickets):
-            raise HTTPException(status_code=400, detail="Уже есть билет этого типа")
 
 def generate_ticket_number(ticket_type: str, db: Session):
     prefix = db.execute(select(TicketType.symbol).where(TicketType.name == ticket_type)).scalar_one_or_none()
 
     last_ticket = db.execute(
         select(Ticket)
-        .where(Ticket.name.like(f"{prefix}-%"))
+        # .where(Ticket.name.like(f"{prefix}-%"))
         .order_by(Ticket.name.desc())
         .limit(1)
     ).scalar_one_or_none()
