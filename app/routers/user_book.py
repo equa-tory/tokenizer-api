@@ -11,7 +11,7 @@ from app.schemas import TicketOut
 router = APIRouter()
 
 
-@router.post("/", response_model=TicketOut)
+@router.post("/")
 def book_ticket(
     type: str,
     id: int,

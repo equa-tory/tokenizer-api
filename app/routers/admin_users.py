@@ -8,7 +8,7 @@ from app.schemas import UserOut
 router = APIRouter()
 
 
-@router.post("/", response_model=dict[str, UserOut])
+@router.post("/")
 def upsert_user(
     id: Optional[int] = None,
     name: str = Query(...),
