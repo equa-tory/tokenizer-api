@@ -16,12 +16,12 @@ def get_user(id: int = None, tg: int = None, db: Session = Depends(get_db)):
     if tg:
         user = db.execute(select(User).where(User.tg_id == tg)).scalar_one_or_none()
         if not user:
-            raise HTTPException(status_code=404, detail="TG Пользователь не найден")
+            raise HTTPException(status_code=404, detail="TG User not found")
 
     else:
         user = db.get(User, id)
         if not user:
-            raise HTTPException(status_code=404, detail="Пользователь не найден")
+            raise HTTPException(status_code=404, detail="User not found")
     return user
 
 
@@ -32,7 +32,7 @@ def check_ticket_rules(user: User, ticket_type: str, timestamp: datetime | None,
     ).scalar_one_or_none()
 
     if not tt:
-        raise HTTPException(status_code=400, detail="Неверный тип билета")
+        raise HTTPException(status_code=400, detail="Wrong ticket type")
 
     # --- timestamp check logic ---
     # TODO:
@@ -40,36 +40,38 @@ def check_ticket_rules(user: User, ticket_type: str, timestamp: datetime | None,
     # 2. check if timestamp is in the future
     # 3. check if timestamp is in right dates and time slots
 
-    # get last ticket and check if 10 minutes have passed
-    last_ticket = db.execute( # TODO: think if it should be only debt or for all types cooldown
-        select(Ticket)
-        .order_by(Ticket.timestamp.desc())
-        .limit(1)
-    ).scalar_one_or_none()
+    # --- cooldown logic ---
+    if ticket_type == db.execute(select(TicketType.name)).scalars().first():
+        # get last ticket and check if 10 minutes have passed
+        last_ticket = db.execute( # TODO: think if it should be only debt or for all types cooldown
+            select(Ticket)
+            .order_by(Ticket.timestamp.desc())
+            .limit(1)
+        ).scalar_one_or_none()
 
-    if last_ticket: # example cooldown for same type: last_ticket.type == ticket_type: --- IGNORE ---
-        from datetime import datetime, timedelta
-        now = datetime.utcnow()
-        cooldown = 10  # minutes # TODO: config cooldown
-        if last_ticket.created_at and (now - last_ticket.created_at) < timedelta(minutes=cooldown):
-            raise HTTPException(
-                status_code=400,
-                detail=f"Подождите минимум {cooldown} минут перед созданием нового билета"
-            )
+        if last_ticket and last_ticket.ticket_type.name == ticket_type: # example cooldown for same type: last_ticket.type == ticket_type: --- IGNORE ---
+            from datetime import datetime, timedelta
+            now = datetime.utcnow()
+            cooldown = 10  # minutes # TODO: config cooldown
+            if last_ticket.created_at and (now - last_ticket.created_at) < timedelta(minutes=cooldown):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Wait at least {cooldown} minutes between issuing tickets of the same type"
+                )
 
 
 
     # --- require_time logic ---
     if tt.require_time and tt.require_time > 0:
         if not timestamp:
-            raise HTTPException(status_code=400, detail="Для этого типа билета требуется время")
+            raise HTTPException(status_code=400, detail="This ticket type requires a timestamp")
 
         # timestamp uniqueness (global)
         exists = db.execute(
             select(Ticket.id).where(Ticket.timestamp == timestamp)
         ).scalar_one_or_none()
         if exists:
-            raise HTTPException(status_code=400, detail="Это время уже занято")
+            raise HTTPException(status_code=400, detail="Timestamp already taken")
     else:
         # timestamp must be ignored completely
         timestamp = None
@@ -87,7 +89,7 @@ def check_ticket_rules(user: User, ticket_type: str, timestamp: datetime | None,
     if tt.max_per_user is not None and len(user_tickets_of_type) >= tt.max_per_user:
         raise HTTPException(
             status_code=400,
-            detail="Достигнут лимит билетов этого типа"
+            detail="User has reached the maximum number of active tickets of this type"
         )
 
     # --- debt-specific logic (kept but simplified) ---
@@ -102,7 +104,7 @@ def check_ticket_rules(user: User, ticket_type: str, timestamp: datetime | None,
         if last_debt_user_id == user.id and user.debt_streak >= 2:
             raise HTTPException(
                 status_code=400,
-                detail="Нельзя брать задолженность более двух раз подряд"
+                detail="Cannot take debt more than twice in a row"
             )
 
         # reset streaks for others
