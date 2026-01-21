@@ -3,12 +3,12 @@ from sqlalchemy.orm import Session
 from typing import Optional
 from app.models import *
 from app.db import get_db
-
+from app.schemas import TicketTypeOut
 
 router = APIRouter()
 
 
-@router.post("/")
+@router.post("/", response_model=dict[str, TicketTypeOut])
 def upsert_ticket_type(
     id: Optional[int] = None,
     name: str = Query(...),

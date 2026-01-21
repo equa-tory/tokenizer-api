@@ -7,10 +7,10 @@ router = APIRouter()
 
 @router.delete("/")
 def delete_bulk(
-    user_ids: list[int] | None = Query(None, description="Удалить конкретных пользователей по ID"),
-    course_ids: list[int] | None = Query(None, description="Удалить конкретные курсы по ID"),
-    ticket_type_ids: list[int] | None = Query(None, description="Удалить конкретные типы билетов по ID"),
-    ticket_ids: list[int] | None = Query(None, description="Удалить конкретные билеты по ID"),
+    user_ids: list[int] | None = Query(None, description="Delete users by ID (-1 for all)"),
+    course_ids: list[int] | None = Query(None, description="Delete specific courses by ID (-1 for all)"),
+    ticket_type_ids: list[int] | None = Query(None, description="Delete specific ticket types by ID (-1 for all)"),
+    ticket_ids: list[int] | None = Query(None, description="Delete specific tickets by ID (-1 for all)"),
     db: Session = Depends(get_db),
 ):
     try:
@@ -71,7 +71,7 @@ def delete_bulk(
               .delete(synchronize_session=False)
 
         db.commit()
-        return {"status": "success", "message": "Удаление выполнено!"}
+        return {"status": "success", "message": "Deletion completed successfully."}
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Ошибка при удалении: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error during deletion: {str(e)}")

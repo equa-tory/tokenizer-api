@@ -6,17 +6,18 @@ from app.db import get_db
 from datetime import datetime
 from sqlalchemy import select
 from logic import get_user, check_ticket_rules, generate_ticket_number
+from app.schemas import TicketOut
 
 router = APIRouter()
 
 
-@router.post("/")
+@router.post("/", response_model=TicketOut)
 def book_ticket(
-    type: str = Query(...),
+    type: str,
+    id: int,
+    tg: Optional[int] = None,
     timestamp: Optional[datetime] = None,
-    id: int = Query(...),
-    tg: int = Query(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     user = get_user(id=id, tg=tg, db=db)
     check_ticket_rules(user, type, timestamp, db)
@@ -27,7 +28,7 @@ def book_ticket(
     ).scalar_one_or_none()
 
     if not ticket_type_obj:
-        raise HTTPException(status_code=404, detail="Тип билета не найден")
+        raise HTTPException(status_code=404, detail="Ticket type not found")
 
     ticket = Ticket(
         name=ticket_number,

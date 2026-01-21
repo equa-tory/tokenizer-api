@@ -41,17 +41,17 @@ def check_ticket_rules(user: User, ticket_type: str, timestamp: datetime | None,
     # 3. check if timestamp is in right dates and time slots
 
     # get last ticket and check if 10 minutes have passed
-    last_ticket = db.execute(
+    last_ticket = db.execute( # TODO: think if it should be only debt or for all types cooldown
         select(Ticket)
         .order_by(Ticket.timestamp.desc())
         .limit(1)
     ).scalar_one_or_none()
 
-    if last_ticket:
+    if last_ticket: # example cooldown for same type: last_ticket.type == ticket_type: --- IGNORE ---
         from datetime import datetime, timedelta
         now = datetime.utcnow()
         cooldown = 10  # minutes # TODO: config cooldown
-        if last_ticket.timestamp and (now - last_ticket.timestamp) < timedelta(minutes=cooldown):
+        if last_ticket.created_at and (now - last_ticket.created_at) < timedelta(minutes=cooldown):
             raise HTTPException(
                 status_code=400,
                 detail=f"Подождите минимум {cooldown} минут перед созданием нового билета"

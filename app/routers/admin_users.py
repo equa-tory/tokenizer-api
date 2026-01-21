@@ -3,12 +3,12 @@ from sqlalchemy.orm import Session
 from typing import Optional
 from app.models import User
 from app.db import get_db
-
+from app.schemas import UserOut
 
 router = APIRouter()
 
 
-@router.post("/")
+@router.post("/", response_model=dict[str, UserOut])
 def upsert_user(
     id: Optional[int] = None,
     name: str = Query(...),

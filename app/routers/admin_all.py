@@ -3,10 +3,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app.models import *
 from app.db import get_db
+from app.schemas import AllDataOut
 
 router = APIRouter()
 
-@router.get("/")
+@router.get("/", response_model=AllDataOut)
 def get_all(db: Session = Depends(get_db)):
     users = db.query(User).all()
     courses = db.query(Course).all()

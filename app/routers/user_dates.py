@@ -18,4 +18,4 @@ def get_days(course_id: int, db: Session = Depends(get_db)):
         days_ahead = 7
     first_friday = today + datetime.timedelta(days=days_ahead)
     second_friday = first_friday + datetime.timedelta(days=7)
-    return {"fridays": [first_friday.isoformat(), second_friday.isoformat()]}
+    return [first_friday.isoformat(), second_friday.isoformat()]
