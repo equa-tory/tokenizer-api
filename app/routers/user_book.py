@@ -1,12 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from app.models import Course, Ticket, TicketType, User
-from typing import Optional
-from app.db import get_db
-from datetime import datetime
 from sqlalchemy import select
+from typing import Optional
+from datetime import datetime
+
+from app.db import get_db
+from app.models import Ticket, TicketType
 from logic import get_user, check_ticket_rules, generate_ticket_number
-from app.schemas import TicketOut
 
 router = APIRouter()
 
@@ -32,7 +32,7 @@ def book_ticket(
 
     ticket = Ticket(
         name=ticket_number,
-        status="active",
+        status="active", # TODO: add logic
         ticket_type_id=ticket_type_obj.id,
         user_id=user.id,
         timestamp=timestamp if ticket_type_obj.require_time else None,

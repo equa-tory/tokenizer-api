@@ -2,11 +2,27 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app.models import Course, Ticket, TicketType, User
 from app.db import get_db
-from datetime import datetime
+import datetime
+from datetime import datetime, timedelta, time as dt_time
 from sqlalchemy import select
+from sqlalchemy import and_
+from datetime import datetime, timedelta
 
 from models import *
 from db import engine
+
+
+
+# ----------------------------
+
+START_TIME = dt_time(16, 0)
+END_TIME = dt_time(18, 0)
+SLOT_INTERVAL = 10  # minutes
+DEBT_WEEKDAY = 4 # friday
+DEBT_COOLDOWN = 15  # minutes
+
+# ----------------------------
+
 
 
 
@@ -35,15 +51,50 @@ def check_ticket_rules(user: User, ticket_type: str, timestamp: datetime | None,
         raise HTTPException(status_code=400, detail="Wrong ticket type")
 
     # --- timestamp check logic ---
-    # TODO:
-    # 1. check if timestamp is taken
-    # 2. check if timestamp is in the future
-    # 3. check if timestamp is in right dates and time slots
+    
+    if timestamp:
+        now = datetime.utcnow()
+
+        # 1. только будущее
+        if timestamp <= now:
+            raise HTTPException(status_code=400, detail="Timestamp must be in the future")
+
+        # 2. проверка даты (должна быть в ближайшую или следующую пятницу)
+        today = now.date()
+        days_ahead = (DEBT_WEEKDAY - today.weekday()) % 7
+        if days_ahead == 0 and now.time() >= START_TIME:
+            days_ahead = 7
+        first_friday = today + timedelta(days=days_ahead)
+        second_friday = first_friday + timedelta(days=7)
+        if timestamp.date() not in [first_friday, second_friday]:
+            raise HTTPException(status_code=400, detail="Timestamp date must be on allowed days")
+
+        # 3. проверка времени дня
+        if not (START_TIME <= timestamp.time() < END_TIME):
+            raise HTTPException(status_code=400, detail="Timestamp out of allowed time range")
+
+        # 4. проверка кратности слоту
+        if timestamp.minute % SLOT_INTERVAL != 0 or timestamp.second != 0:
+            raise HTTPException(status_code=400, detail="Timestamp is not aligned with slot interval")
+
+        # 5. слот не занят (через БД)   
+        taken = db.execute(
+            select(Ticket.id).where(
+                and_(
+                    Ticket.timestamp == timestamp,
+                    Ticket.status == "active"
+                )
+            )
+        ).scalar_one_or_none()
+
+        if taken:
+            raise HTTPException(status_code=400, detail="This time slot is already taken")
+
 
     # --- cooldown logic ---
     if ticket_type == db.execute(select(TicketType.name)).scalars().first():
-        # get last ticket and check if 10 minutes have passed
-        last_ticket = db.execute( # TODO: think if it should be only debt or for all types cooldown
+        # get last ticket and check if N minutes have passed
+        last_ticket = db.execute(
             select(Ticket)
             .order_by(Ticket.timestamp.desc())
             .limit(1)
@@ -52,7 +103,7 @@ def check_ticket_rules(user: User, ticket_type: str, timestamp: datetime | None,
         if last_ticket and last_ticket.ticket_type.name == ticket_type: # example cooldown for same type: last_ticket.type == ticket_type: --- IGNORE ---
             from datetime import datetime, timedelta
             now = datetime.utcnow()
-            cooldown = 10  # minutes # TODO: config cooldown
+            cooldown = DEBT_COOLDOWN
             if last_ticket.created_at and (now - last_ticket.created_at) < timedelta(minutes=cooldown):
                 raise HTTPException(
                     status_code=400,
@@ -128,3 +179,59 @@ def generate_ticket_number(ticket_type: str, db: Session):
 
     last_number = int(last_ticket.name.split("-")[1]) if last_ticket else 0
     return f"{prefix}-{str(last_number + 1).zfill(4)}"
+
+
+
+
+# if need only timeslots
+# def get_timeslots(date: str, db: Session):
+#     query_date = datetime.strptime(date, "%Y-%m-%d").date()
+#     start_time = datetime.combine(query_date, START_TIME)
+#     end_time = datetime.combine(query_date, END_TIME)
+#     slots = []
+#     current = start_time
+#     while current < end_time:
+#         taken = db.query(Ticket).filter(Ticket.timestamp == current).first()
+#         slots.append({"time": current.time().strftime("%H:%M"), "available": not bool(taken)})
+#         current += timedelta(minutes=SLOT_INTERVAL)
+#     return slots
+
+def get_timeslots(db: Session):
+    today = datetime.now().date()
+
+    # вычисляем ближайшую и следующую пятницу (как в get_days)
+    days_ahead = (DEBT_WEEKDAY - today.weekday()) % 7
+    if days_ahead == 0 and datetime.now().time() >= START_TIME:
+        days_ahead = 7
+
+    dates = [
+        today + timedelta(days=days_ahead),
+        today + timedelta(days=days_ahead + 7),
+    ]
+
+    result = []
+
+    for d in dates:
+        start_time = datetime.combine(d, START_TIME)
+        end_time = datetime.combine(d, END_TIME)
+
+        slots = []
+        current = start_time
+        while current < end_time:
+            taken = db.execute(
+                select(Ticket.id).where(Ticket.timestamp == current)
+            ).scalar_one_or_none()
+
+            slots.append({
+                "time": current.time().strftime("%H:%M"),
+                "available": not bool(taken),
+            })
+
+            current += timedelta(minutes=SLOT_INTERVAL)
+
+        result.append({
+            "date": d.isoformat(),
+            "slots": slots,
+        })
+
+    return result

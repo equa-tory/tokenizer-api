@@ -1,22 +1,11 @@
 # normal
-import datetime
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from app.models import Course, Ticket
 from app.db import get_db
-from datetime import datetime, timedelta, time as dt_time
+from logic import get_timeslots
 
 router = APIRouter()
 
 @router.get("/")
-def get_timeslots(date: str, db: Session = Depends(get_db)):
-    query_date = datetime.strptime(date, "%Y-%m-%d").date()
-    start_time = datetime.combine(query_date, dt_time(16,0)) # TODO: fix time
-    end_time = datetime.combine(query_date, dt_time(18,0)) # TODO: fix time
-    slots = []
-    current = start_time
-    while current < end_time:
-        taken = db.query(Ticket).filter(Ticket.timestamp == current).first()
-        slots.append({"time": current.time().strftime("%H:%M"), "available": not bool(taken)})
-        current += timedelta(minutes=10)
-    return {"timeslots": slots}
+def get_slots(db: Session = Depends(get_db)):
+    return {"timeslots": get_timeslots(db)}

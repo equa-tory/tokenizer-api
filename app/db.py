@@ -2,8 +2,14 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from app.models import Base, TicketType
 from time import sleep
+import os
+from dotenv import load_dotenv
 
-DATABASE_URL = "postgresql://postgres:postgres@db:5432/fastapidb"
+load_dotenv()
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+
 
 for _ in range(10):
     try:
@@ -53,3 +59,4 @@ def ensure_default_tickettypes(db: Session) -> None:
 
     if to_create:
         db.add_all(to_create)
+        db.commit()

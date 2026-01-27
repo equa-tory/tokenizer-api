@@ -111,7 +111,7 @@ def book_ticket(
 
     ticket = Ticket(
         name=ticket_number,
-        status="active", # TODO: add logic
+        status="active",
         ticket_type=ticket_type_obj,
         user_id=user.id,
         timestamp=timestamp
