@@ -8,7 +8,7 @@ from app.schemas import AdminTicketTypeIn
 router = APIRouter()
 
 
-@router.post("/", response_model=AdminTicketTypeIn)
+@router.post("/")
 def upsert_ticket_type(
     id: Optional[int] = None,
     name: str = Query(...),

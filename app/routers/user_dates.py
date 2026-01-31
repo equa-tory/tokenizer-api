@@ -25,7 +25,7 @@ router = APIRouter()
 
 
 # all fridays
-@router.get("/", response_model=UserTimeslotsIn)
+@router.get("/")
 def get_days(db: Session = Depends(get_db)):
     today = datetime.datetime.now().date()
     days_ahead = (DEBT_WEEKDAY - today.weekday()) % 7

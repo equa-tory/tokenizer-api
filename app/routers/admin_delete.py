@@ -6,7 +6,7 @@ from app.schemas import AdminDeleteIn
 
 router = APIRouter()
 
-@router.delete("/", response_model=AdminDeleteIn)
+@router.delete("/")
 def delete_bulk(
     user_ids: list[int] | None = Query(None, description="Delete users by ID (-1 for all)"),
     course_ids: list[int] | None = Query(None, description="Delete specific courses by ID (-1 for all)"),

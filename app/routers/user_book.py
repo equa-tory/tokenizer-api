@@ -13,7 +13,7 @@ from app.schemas import UserBookIn
 router = APIRouter()
 
 
-@router.post("/", response_model=UserBookIn)
+@router.post("/")
 def book_ticket(
     type: str,
     id: Optional[int] = None,

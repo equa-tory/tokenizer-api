@@ -10,7 +10,7 @@ from app.schemas import UserCancelIn
 router = APIRouter()
 
 
-@router.post("/", response_model=UserCancelIn)
+@router.post("/")
 def cancel_ticket(
     ticket_id: str = Query(...),
     db: Session = Depends(get_db)

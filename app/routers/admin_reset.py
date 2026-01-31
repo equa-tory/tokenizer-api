@@ -6,7 +6,7 @@ from app.schemas import AdminResetIn
 
 router = APIRouter()
 
-@router.post("/", response_model=AdminResetIn)
+@router.post("/")
 def reset_db(
     # confirm: bool = False,
     # x_admin_token: str | None = Header(default=None),

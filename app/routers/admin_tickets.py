@@ -7,7 +7,7 @@ from app.schemas import AdminTicketIn
 
 router = APIRouter()
 
-@router.post("/", response_model=AdminTicketIn)
+@router.post("/")
 def upsert_ticket(
     id: Optional[int] = None,
     name: Optional[str] = None,

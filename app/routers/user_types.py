@@ -7,6 +7,6 @@ from app.schemas import UserTypesIn
 
 router = APIRouter()
 
-@router.get("/", response_model=UserTypesIn)
+@router.get("/")
 def get_valid_types(db: Session = Depends(get_db)):
     return db.query(TicketType).all()

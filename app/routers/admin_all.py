@@ -7,7 +7,7 @@ from app.schemas import AdminAllIn
 
 router = APIRouter()
 
-@router.get("/", response_model=AdminAllIn)
+@router.get("/")
 def get_all(db: Session = Depends(get_db)):
     users = db.query(User).all()
     courses = db.query(Course).all()

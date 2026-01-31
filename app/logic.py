@@ -51,7 +51,8 @@ def check_ticket_rules(user: User, ticket_type: str, timestamp: datetime | None,
         raise HTTPException(status_code=400, detail="Wrong ticket type")
 
     # --- timestamp check logic ---
-    
+    from datetime import datetime, timedelta # TODO: wtf
+
     if timestamp:
         now = datetime.utcnow()
 

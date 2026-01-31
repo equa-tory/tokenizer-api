@@ -10,7 +10,7 @@ from app.schemas import UserStatusIn
 router = APIRouter()
 
 
-@router.get("/", response_model=UserStatusIn)
+@router.get("/")
 def status(
     id: int = Query(None),
     tg_id: int = Query(None),
