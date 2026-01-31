@@ -35,7 +35,7 @@ def get_all(db: Session = Depends(get_db)):
 
     return {
         "users": [{"id": u.id, "name": u.name, "tg_id": u.tg_id, "course_id": u.course_id, "debt_streak": u.debt_streak} for u in users],
-        "courses": courses_out,
+        #"courses": courses_out,
         "ticket_types": [{"id": tt.id, "name": tt.name, "title": tt.title, "max_per_user": tt.max_per_user, "require_time": tt.require_time, "symbol": tt.symbol} for tt in ticket_types],
-        "tickets": [{"id": t.id, "name": t.name, "status": t.status, "user_id": t.user_id, "ticket_type_id": t.ticket_type_id, "timestamp": t.timestamp.isoformat() if t.timestamp else None} for t in tickets],
+        "tickets": [{"id": t.id, "name": t.name, "status": t.status, "user_id": t.user_id, "ticket_type_id": t.ticket_type_id, "timestamp": t.timestamp.isoformat() if t.timestamp else None, "created_at": t.created_at} for t in tickets],
     }

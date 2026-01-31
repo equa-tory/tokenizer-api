@@ -31,7 +31,7 @@ def status(
     # ---- Last queued ticket ----
     last_ticket = db.execute(
         select(Ticket)
-        .order_by(Ticket.timestamp.desc())
+        .order_by(Ticket.created_at.desc())
         .limit(1)
     ).scalar_one_or_none()
 
