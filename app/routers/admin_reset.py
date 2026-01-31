@@ -2,10 +2,11 @@ from http.client import HTTPException
 from app.db import engine, SessionLocal, ensure_default_tickettypes
 from app.models import Base
 from fastapi import Header, APIRouter
+from app.schemas import AdminResetIn
 
 router = APIRouter()
 
-@router.post("/")
+@router.post("/", response_model=AdminResetIn)
 def reset_db(
     # confirm: bool = False,
     # x_admin_token: str | None = Header(default=None),

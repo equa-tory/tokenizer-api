@@ -2,10 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app.db import get_db
 from app.models import User, Course, TicketType, Ticket, course_tickettype
+from app.schemas import AdminDeleteIn
 
 router = APIRouter()
 
-@router.delete("/")
+@router.delete("/", response_model=AdminDeleteIn)
 def delete_bulk(
     user_ids: list[int] | None = Query(None, description="Delete users by ID (-1 for all)"),
     course_ids: list[int] | None = Query(None, description="Delete specific courses by ID (-1 for all)"),

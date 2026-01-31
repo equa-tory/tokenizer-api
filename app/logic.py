@@ -26,11 +26,11 @@ DEBT_COOLDOWN = 15  # minutes
 
 
 
-def get_user(id: int = None, tg: int = None, db: Session = Depends(get_db)):
-    if not id and not tg:
+def get_user(id: int = None, tg_id: int = None, db: Session = Depends(get_db)):
+    if not id and not tg_id:
         raise HTTPException(status_code=400, detail="Provide ?id= or ?tg=")
-    if tg:
-        user = db.execute(select(User).where(User.tg_id == tg)).scalar_one_or_none()
+    if tg_id:
+        user = db.execute(select(User).where(User.tg_id == tg_id)).scalar_one_or_none()
         if not user:
             raise HTTPException(status_code=404, detail="TG User not found")
 

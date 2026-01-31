@@ -3,17 +3,18 @@ from sqlalchemy.orm import Session
 from typing import Optional
 from app.models import User
 from app.db import get_db
-from app.schemas import UserOut
+from app.schemas import AdminUserIn
 
 router = APIRouter()
 
 
-@router.post("/")
+@router.post("/", response_model=AdminUserIn)
 def upsert_user(
     id: Optional[int] = None,
-    name: str = Query(...),
-    course_id: Optional[int] = None,
     tg_id: Optional[str] = None,
+    name: str = Query(...),
+    debt_streak: Optional[int] = None,
+    course_id: Optional[int] = None,
     db: Session = Depends(get_db),
 ):
     if id:
@@ -27,6 +28,8 @@ def upsert_user(
             user.course_id = course_id
         if tg_id is not None:
             user.tg_id = tg_id
+        if debt_streak is not None:
+            user.debt_streak = debt_streak
 
         db.commit()
         db.refresh(user)
@@ -35,7 +38,7 @@ def upsert_user(
     if not name:
         raise HTTPException(400, detail="Name is required for creating a new user")
 
-    user = User(name=name, course_id=course_id, tg_id=tg_id)
+    user = User(name=name, course_id=course_id, tg_id=tg_id, debt_streak=debt_streak)
     db.add(user)
     db.commit()
     db.refresh(user)

@@ -16,7 +16,7 @@ course_tickettype = Table(
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
-    tg_id: Optional[str] = Column(String, unique=True, nullable=True)
+    tg_id: Optional[int] = Column(Integer, unique=True, nullable=True)
     name = Column(String, nullable=False)
 
     tickets = relationship("Ticket", back_populates="user")

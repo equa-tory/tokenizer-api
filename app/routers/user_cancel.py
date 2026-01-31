@@ -5,11 +5,12 @@ from app.models import Course, Ticket, TicketType, User
 from app.db import get_db
 from datetime import datetime
 from sqlalchemy import select
+from app.schemas import UserCancelIn
 
 router = APIRouter()
 
 
-@router.post("/")
+@router.post("/", response_model=UserCancelIn)
 def cancel_ticket(
     ticket_id: str = Query(...),
     db: Session = Depends(get_db)

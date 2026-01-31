@@ -3,10 +3,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app.models import *
 from app.db import get_db
+from app.schemas import AdminTicketIn
 
 router = APIRouter()
 
-@router.post("/")
+@router.post("/", response_model=AdminTicketIn)
 def upsert_ticket(
     id: Optional[int] = None,
     name: Optional[str] = None,

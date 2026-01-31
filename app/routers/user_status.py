@@ -5,16 +5,21 @@ from app.db import get_db
 from datetime import datetime
 from sqlalchemy import select
 from logic import get_user
+from app.schemas import UserStatusIn
 
 router = APIRouter()
 
 
-@router.get("/")
+@router.get("/", response_model=UserStatusIn)
 def status(
     id: int = Query(None),
+    tg_id: int = Query(None),
     db: Session = Depends(get_db),
 ):
-    user = get_user(id=id, db=db)
+    if not id and not tg_id:
+        raise HTTPException(status_code=400, detail="Provide ?id= or ?tg=")
+
+    user = get_user(id=id, tg_id=tg_id, db=db)
 
     # ---- Get tickets ----
     tickets = db.execute(

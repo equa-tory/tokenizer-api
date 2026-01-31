@@ -7,19 +7,24 @@ from datetime import datetime
 from app.db import get_db
 from app.models import Ticket, TicketType
 from logic import get_user, check_ticket_rules, generate_ticket_number
+from app.schemas import UserBookIn
+
 
 router = APIRouter()
 
 
-@router.post("/")
+@router.post("/", response_model=UserBookIn)
 def book_ticket(
     type: str,
-    id: int,
-    tg: Optional[int] = None,
+    id: Optional[int] = None,
+    tg_id: Optional[int] = None,
     timestamp: Optional[datetime] = None,
     db: Session = Depends(get_db),
 ):
-    user = get_user(id=id, tg=tg, db=db)
+    if not id and not tg_id:
+        raise HTTPException(status_code=400, detail="Provide ?id= or ?tg=")
+
+    user = get_user(id=id, tg_id=tg_id, db=db)
     check_ticket_rules(user, type, timestamp, db)
     ticket_number = generate_ticket_number(type, db)
 

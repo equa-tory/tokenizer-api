@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.models import Course
 from app.db import get_db
 from logic import START_TIME, END_TIME, SLOT_INTERVAL, DEBT_WEEKDAY
+from app.schemas import UserTimeslotsIn
 
 router = APIRouter()
 
@@ -24,7 +25,7 @@ router = APIRouter()
 
 
 # all fridays
-@router.get("/")
+@router.get("/", response_model=UserTimeslotsIn)
 def get_days(db: Session = Depends(get_db)):
     today = datetime.datetime.now().date()
     days_ahead = (DEBT_WEEKDAY - today.weekday()) % 7
