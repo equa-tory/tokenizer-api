@@ -25,8 +25,8 @@ def status(
     tickets = db.execute(
         select(Ticket).where(Ticket.user_id == user.id)
     ).scalars().all()
-    if not tickets:
-        raise HTTPException(status_code=404, detail="User has no tickets")
+    # if not tickets:
+    #     raise HTTPException(status_code=404, detail="User has no tickets")
 
     # ---- Last queued ticket ----
     last_ticket = db.execute(
