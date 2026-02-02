@@ -28,7 +28,7 @@ def status(
     # if not tickets:
     #     raise HTTPException(status_code=404, detail="User has no tickets")
 
-    # ---- Last queued ticket ----
+    # ---- Last queued ticket ---- #TODO: change logic (not last taken ticket)
     last_ticket = db.execute(
         select(Ticket)
         .order_by(Ticket.created_at.desc())
