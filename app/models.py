@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Date, Time, DateTime, Table
+from sqlalchemy import Column, Integer, String, ForeignKey, Date, Time, DateTime, Table, BigInteger
 from sqlalchemy.orm import relationship, declarative_base
 from datetime import datetime
 from typing import Optional
@@ -16,7 +16,7 @@ course_tickettype = Table(
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
-    tg_id: Optional[int] = Column(Integer, unique=True, nullable=True)
+    tg_id: Optional[int] = Column(BigInteger, unique=True, nullable=True)
     name = Column(String, nullable=False)
 
     tickets = relationship("Ticket", back_populates="user")
