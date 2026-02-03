@@ -33,17 +33,38 @@ def ensure_default_tickettypes(db: Session) -> None:
     defaults = [
         {
             "name": "debt",
-            "title": "Задолженность",
+            "title": "Сдача Задолженностей",
             "max_per_user": 5,
             "require_time": 1,
             "symbol": "З",
         },
         {
             "name": "zachet",
-            "title": "Зачёт",
+            "title": "Сдача Зачёта",
             "max_per_user": 1,
             "require_time": 0,
             "symbol": "Ë",
+        },
+        {
+            "name": "exam",
+            "title": "Сдача Экзамена",
+            "max_per_user": 1,
+            "require_time": 0,
+            "symbol": "Э",
+        },
+        {
+            "name": "report",
+            "title": "Сдача Отчёта",
+            "max_per_user": 1,
+            "require_time": 0,
+            "symbol": "О",
+        },
+        {
+            "name": "diploma",
+            "title": "Сдача Диплома",
+            "max_per_user": 1,
+            "require_time": 0,
+            "symbol": "Д",
         },
     ]
 

@@ -12,7 +12,7 @@ router = APIRouter()
 def upsert_user(
     id: Optional[int] = None,
     tg_id: Optional[str] = None,
-    name: str = Query(...),
+    name: Optional[str] = None,
     debt_streak: Optional[int] = None,
     course_id: Optional[int] = None,
     db: Session = Depends(get_db),
@@ -21,6 +21,9 @@ def upsert_user(
         user = db.query(User).get(id)
         if not user:
             raise HTTPException(404)
+        
+        if name is None and id is None:
+            raise HTTPException(400, detail="Name is required for creating a user")
 
         if name is not None:
             user.name = name
