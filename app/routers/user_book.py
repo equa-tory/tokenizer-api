@@ -26,7 +26,7 @@ def book_ticket(
 
     user = get_user(id=id, tg_id=tg_id, db=db)
     check_ticket_rules(user, type, timestamp, db)
-    ticket_number = generate_ticket_number(type, db)
+    ticket_title, ticket_number = generate_ticket_number(type, db)
 
     ticket_type_obj = db.execute(
         select(TicketType).where(TicketType.name == type)
@@ -36,7 +36,8 @@ def book_ticket(
         raise HTTPException(status_code=404, detail="Ticket type not found")
 
     ticket = Ticket(
-        name=ticket_number,
+        name=ticket_title,
+        number=ticket_number, # TODO: if more than (config) 9999 -> go 0000
         status="active", # TODO: add logic
         ticket_type_id=ticket_type_obj.id,
         user_id=user.id,

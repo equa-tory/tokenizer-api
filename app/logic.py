@@ -4,8 +4,7 @@ from app.models import Course, Ticket, TicketType, User
 from app.db import get_db
 import datetime
 from datetime import datetime, timedelta, time as dt_time
-from sqlalchemy import select
-from sqlalchemy import and_
+from sqlalchemy import select, and_, func
 from datetime import datetime, timedelta
 
 from models import *
@@ -171,15 +170,13 @@ def check_ticket_rules(user: User, ticket_type: str, timestamp: datetime | None,
 def generate_ticket_number(ticket_type: str, db: Session):
     prefix = db.execute(select(TicketType.symbol).where(TicketType.name == ticket_type)).scalar_one_or_none()
 
-    last_ticket = db.execute(
-        select(Ticket)
-        # .where(Ticket.name.like(f"{prefix}-%"))
-        .order_by(Ticket.name.desc())
-        .limit(1)
-    ).scalar_one_or_none()
+    last_number = db.execute(
+        select(func.max(Ticket.number))
+    ).scalar() or 0
 
-    last_number = int(last_ticket.name.split("-")[1]) if last_ticket else 0
-    return f"{prefix}-{str(last_number + 1).zfill(4)}"
+    number = last_number + 1
+    name = f"{prefix}-{str(number).zfill(4)}"
+    return name, number
 
 
 

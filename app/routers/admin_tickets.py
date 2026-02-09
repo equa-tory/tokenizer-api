@@ -1,6 +1,7 @@
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import select, and_, func
 from app.models import *
 from app.db import get_db
 from app.schemas import AdminTicketIn
@@ -11,6 +12,7 @@ router = APIRouter()
 def upsert_ticket(
     id: Optional[int] = None,
     name: Optional[str] = None,
+    number: Optional[int] = None,
     status: Optional[str] = None,
     timestamp: Optional[datetime] = None,
     user_id: Optional[int] = None,
@@ -25,6 +27,8 @@ def upsert_ticket(
 
         if name is not None:
             ticket.name = name
+        if number is not None:
+            ticket.number = number
         if status is not None:
             ticket.status = status
         if timestamp is not None:
@@ -39,11 +43,27 @@ def upsert_ticket(
         return {"mode": "updated", "ticket": ticket}
 
     # --- CREATE ---
-    if not name or not status:
-        raise HTTPException(status_code=400, detail="name and status are required for create")
+    # if not ticket_type_id:
+    #     raise HTTPException(status_code=400, detail="type id is required for creation")
+    
+    if not number: # get last +1
+        last_number = db.execute(
+            select(func.max(Ticket.number))
+        ).scalar() or 0
+
+        number = last_number + 1
+
+    if not name:
+        # make prefix based on related ticket_type title first letter
+        prefix = db.execute(
+            select(TicketType.symbol).where(TicketType.id == ticket_type_id)
+        ).scalar_one_or_none()
+
+        name = f"{prefix}-{str(number).zfill(4)}"
 
     ticket = Ticket(
         name=name,
+        number=number,
         status=status,
         timestamp=timestamp,
         user_id=user_id,

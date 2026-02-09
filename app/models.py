@@ -55,7 +55,8 @@ class Ticket(Base):
     __tablename__ = "tickets"
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
-    status = Column(String, nullable=False)
+    number = Column(Integer, nullable=False)
+    status = Column(String, default="active")
     timestamp = Column(DateTime)
     created_at = Column(DateTime, default=datetime.utcnow)
 
@@ -64,3 +65,6 @@ class Ticket(Base):
 
     ticket_type_id = Column(Integer, ForeignKey("tickettypes.id"))
     ticket_type = relationship("TicketType", back_populates="tickets")
+
+# TODO: add log table
+# ...
