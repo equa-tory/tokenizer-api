@@ -82,6 +82,26 @@ def check_ticket_rules(user: User, ticket_type: str, timestamp: datetime | None,
         if taken:
             raise HTTPException(status_code=400, detail="This time slot is already taken")
 
+        # 6. слот не входит в ближайшие 20 минут (--+--+--)
+        # 6. пользователь не может бронировать слот ближе чем за 20 минут к своим активным билетам
+        window_start = timestamp - timedelta(minutes=DEBT_BOOK_WINDOW+SLOT_INTERVAL) # TODO: move to config.py
+        window_end = timestamp + timedelta(minutes=DEBT_BOOK_WINDOW+SLOT_INTERVAL)
+
+        nearby_count = db.execute(
+            select(func.count()).where(
+                Ticket.user_id == user.id,
+                Ticket.status == "active",
+                Ticket.timestamp >= window_start,
+                Ticket.timestamp <= window_end,
+            )
+        ).scalar_one()
+
+        if nearby_count >= 2:
+            raise HTTPException(
+                status_code=400,
+                detail=f"You already have two tickets within {DEBT_BOOK_WINDOW} minutes of this time slot"
+            )
+        
 
     # --- cooldown logic --- # TODO: can be buggy (none ticket type)
     if ticket_type == db.execute(select(TicketType.name)).scalars().first():
