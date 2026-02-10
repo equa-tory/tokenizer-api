@@ -5,6 +5,7 @@ from sqlalchemy import select, and_, func
 from app.models import *
 from app.db import get_db
 from app.schemas import AdminTicketIn
+from app.logic import generate_ticket_number
 
 router = APIRouter()
 
@@ -43,23 +44,11 @@ def upsert_ticket(
         return {"mode": "updated", "ticket": ticket}
 
     # --- CREATE ---
-    # if not ticket_type_id:
-    #     raise HTTPException(status_code=400, detail="type id is required for creation")
-    
-    if not number: # get last +1
-        last_number = db.execute(
-            select(func.max(Ticket.number))
-        ).scalar() or 0
-
-        number = last_number + 1
-
+    _name, _number = generate_ticket_number(db=db, last_number=number)
     if not name:
-        # make prefix based on related ticket_type title first letter
-        prefix = db.execute(
-            select(TicketType.symbol).where(TicketType.id == ticket_type_id)
-        ).scalar_one_or_none()
-
-        name = f"{prefix}-{str(number).zfill(4)}"
+        name = _name
+    if not number:
+        number = _number
 
     ticket = Ticket(
         name=name,

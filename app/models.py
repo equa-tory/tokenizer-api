@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Date, Time, DateTime, Table, BigInteger
+from sqlalchemy import Column, Integer, String, ForeignKey, Date, Time, DateTime, Table, BigInteger, JSON
 from sqlalchemy.orm import relationship, declarative_base
 from datetime import datetime
 from typing import Optional
@@ -66,5 +66,15 @@ class Ticket(Base):
     ticket_type_id = Column(Integer, ForeignKey("tickettypes.id"))
     ticket_type = relationship("TicketType", back_populates="tickets")
 
-# TODO: add log table
-# ...
+class Log(Base):
+    __tablename__ = "logs"
+
+    id = Column(Integer, primary_key=True)
+    kind = Column(String, nullable=False)  # http | action
+    action = Column(String, nullable=False)
+
+    # user_id = Column(Integer, nullable=True)
+    status_code = Column(Integer, nullable=True)
+
+    data = Column(JSON)        # input / meta
+    created_at = Column(DateTime, default=datetime.utcnow)

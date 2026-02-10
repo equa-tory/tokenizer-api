@@ -1,3 +1,5 @@
+import json
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app.models import Course, Ticket, TicketType, User
@@ -9,19 +11,9 @@ from datetime import datetime, timedelta
 
 from models import *
 from db import engine
-
-
-
-# ----------------------------
-
-START_TIME = dt_time(16, 0)
-END_TIME = dt_time(18, 0)
-SLOT_INTERVAL = 10  # minutes
-DEBT_WEEKDAY = 4 # friday
-DEBT_COOLDOWN = 15  # minutes (def: 15)
+from config import *
 
 # ----------------------------
-
 
 
 
@@ -50,7 +42,7 @@ def check_ticket_rules(user: User, ticket_type: str, timestamp: datetime | None,
         raise HTTPException(status_code=400, detail="Wrong ticket type")
 
     # --- timestamp check logic ---
-    from datetime import datetime, timedelta # TODO: wtf
+    from datetime import datetime, timedelta # TODO: (clean) wtf
 
     if timestamp:
         now = datetime.utcnow()
@@ -91,7 +83,7 @@ def check_ticket_rules(user: User, ticket_type: str, timestamp: datetime | None,
             raise HTTPException(status_code=400, detail="This time slot is already taken")
 
 
-    # --- cooldown logic ---
+    # --- cooldown logic --- # TODO: can be buggy (none ticket type)
     if ticket_type == db.execute(select(TicketType.name)).scalars().first():
         # get last ticket and check if N minutes have passed
         last_ticket = db.execute(
@@ -100,7 +92,8 @@ def check_ticket_rules(user: User, ticket_type: str, timestamp: datetime | None,
             .limit(1)
         ).scalar_one_or_none()
 
-        if last_ticket and last_ticket.ticket_type.name == ticket_type: # example cooldown for same type: last_ticket.type == ticket_type: --- IGNORE ---
+        print(f"tt: {ticket_type},\n lt: {last_ticket}")
+        if last_ticket and last_ticket.ticket_type and last_ticket.ticket_type.name == ticket_type:
             from datetime import datetime, timedelta
             now = datetime.utcnow()
             cooldown = DEBT_COOLDOWN
@@ -167,17 +160,30 @@ def check_ticket_rules(user: User, ticket_type: str, timestamp: datetime | None,
             u.debt_streak = 0
             db.add(u)
 
-def generate_ticket_number(ticket_type: str, db: Session):
-    prefix = db.execute(select(TicketType.symbol).where(TicketType.name == ticket_type)).scalar_one_or_none()
+def generate_ticket_number(db: Session, ticket_type: str = "", last_number: int = 0):
+    prefix = "None"
+    if ticket_type:
+        prefix = db.execute(
+            select(TicketType.symbol).where(TicketType.name == ticket_type)
+        ).scalar_one_or_none()
 
-    last_number = db.execute(
-        select(func.max(Ticket.number))
-    ).scalar() or 0
+    if not last_number:
+        last_number = db.execute(
+            select(Ticket.number)
+            .order_by(Ticket.id.desc())
+            .limit(1)
+        ).scalar() or 0
+    else: last_number -= 1
 
-    number = last_number + 1
+    print(f"last: {last_number}")
+
+    if last_number >= MAX_TICKETS:
+        number = 0
+    else:
+        number = last_number + 1
+
     name = f"{prefix}-{str(number).zfill(4)}"
     return name, number
-
 
 
 
@@ -233,3 +239,31 @@ def get_timeslots(db: Session):
         })
 
     return result
+
+
+
+#region --- LOGS ---
+def safe_json(raw: bytes, limit: int = 2000):
+    if not raw:
+        return None
+    try:
+        text = raw.decode("utf-8")
+        if len(text) > limit:
+            text = text[:limit] + "...truncated"
+        return json.loads(text)
+    except Exception:
+        return {"raw": raw[:limit].decode("utf-8", errors="ignore")}
+    
+
+# def extract_user(request):
+#     # пример: id
+#     id = request.query_params.get("id")
+#     if id:
+#         try:
+#             return int(id)
+#         except ValueError:
+#             return None
+#     else:
+#         id = request.query_params.get("tg_id")
+#     return None
+#endregion --- --- ---
