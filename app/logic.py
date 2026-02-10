@@ -112,7 +112,7 @@ def check_ticket_rules(user: User, ticket_type: str, timestamp: datetime | None,
             .limit(1)
         ).scalar_one_or_none()
 
-        print(f"tt: {ticket_type},\n lt: {last_ticket}")
+        # print(f"tt: {ticket_type},\n lt: {last_ticket}")
         if last_ticket and last_ticket.ticket_type and last_ticket.ticket_type.name == ticket_type:
             from datetime import datetime, timedelta
             now = datetime.utcnow()
@@ -195,7 +195,7 @@ def generate_ticket_number(db: Session, ticket_type: str = "", last_number: int 
         ).scalar() or 0
     else: last_number -= 1
 
-    print(f"last: {last_number}")
+    # print(f"last: {last_number}")
 
     if last_number >= MAX_TICKETS:
         number = 0
