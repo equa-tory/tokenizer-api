@@ -84,23 +84,30 @@ def check_ticket_rules(user: User, ticket_type: str, timestamp: datetime | None,
 
         # 6. слот не входит в ближайшие 20 минут (--+--+--)
         # 6. пользователь не может бронировать слот ближе чем за 20 минут к своим активным билетам
-        window_start = timestamp - timedelta(minutes=DEBT_BOOK_WINDOW+SLOT_INTERVAL) # TODO: move to config.py
-        window_end = timestamp + timedelta(minutes=DEBT_BOOK_WINDOW+SLOT_INTERVAL)
-
-        nearby_count = db.execute(
-            select(func.count()).where(
+        tickets = db.execute(
+            select(Ticket.timestamp).where(
                 Ticket.user_id == user.id,
                 Ticket.status == "active",
-                Ticket.timestamp >= window_start,
-                Ticket.timestamp <= window_end,
             )
-        ).scalar_one()
+        ).scalars().all()
 
-        if nearby_count >= 2:
-            raise HTTPException(
-                status_code=400,
-                detail=f"You already have two tickets within {DEBT_BOOK_WINDOW} minutes of this time slot"
-            )
+        # добавляем текущий слот
+        all_times = sorted(tickets + [timestamp])
+
+        # проверка: нельзя занимать более 2 слотов подряд или с одним промежутком
+        for i in range(len(all_times)):
+            count = 1
+            for j in range(i+1, len(all_times)):
+                diff_slots = (all_times[j] - all_times[j-1]).total_seconds() / 60 / SLOT_INTERVAL
+                if diff_slots <= 2:  # два слота подряд или через один
+                    count += 1
+                    if count > 2:
+                        raise HTTPException(
+                            status_code=400,
+                            detail="Cannot book slots with less than one free slot in between"
+                        )
+                else:
+                    break
         
 
     # --- cooldown logic --- # TODO: can be buggy (none ticket type)
