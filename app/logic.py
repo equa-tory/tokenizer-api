@@ -82,8 +82,8 @@ def check_ticket_rules(user: User, ticket_type: str, timestamp: datetime | None,
         if taken:
             raise HTTPException(status_code=400, detail="This time slot is already taken")
 
-        # 6. слот не входит в ближайшие 20 минут (--+--+--)
-        # 6. пользователь не может бронировать слот ближе чем за 20 минут к своим активным билетам
+        # 6. слот не входит в ближайшие 20 минут (--++--+--)
+        # 16:10, 16:40, 16:50, 17:20, 17:30
         tickets = db.execute(
             select(Ticket.timestamp).where(
                 Ticket.user_id == user.id,
@@ -99,9 +99,9 @@ def check_ticket_rules(user: User, ticket_type: str, timestamp: datetime | None,
             count = 1
             for j in range(i+1, len(all_times)):
                 diff_slots = (all_times[j] - all_times[j-1]).total_seconds() / 60 / SLOT_INTERVAL
-                if diff_slots <= 2:  # два слота подряд или через один
+                if diff_slots <= DEBT_SLOT_GAP:  # два слота подряд или через один
                     count += 1
-                    if count > 2:
+                    if count > DEBT_SLOT_SEQ:
                         raise HTTPException(
                             status_code=400,
                             detail="Cannot book slots with less than one free slot in between"
