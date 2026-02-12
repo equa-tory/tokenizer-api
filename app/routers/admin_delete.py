@@ -8,13 +8,22 @@ router = APIRouter()
 
 @router.delete("/")
 def delete_bulk(
-    user_ids: list[int] | None = Query([-1], description="Delete users by ID (-1 for all)"),
-    course_ids: list[int] | None = Query([-1], description="Delete specific courses by ID (-1 for all)"),
+    user_ids: list[int] | None = Query(None, description="Delete users by ID (-1 for all)"),
+    course_ids: list[int] | None = Query(None, description="Delete specific courses by ID (-1 for all)"),
     ticket_type_ids: list[int] | None = Query(None, description="Delete specific ticket types by ID (-1 for all)"),
-    ticket_ids: list[int] | None = Query([-1], description="Delete specific tickets by ID (-1 for all)"),
+    ticket_ids: list[int] | None = Query(None, description="Delete specific tickets by ID (-1 for all)"),
     db: Session = Depends(get_db),
 ):
     try:
+        if user_ids is None:
+            user_ids = [-1]
+        if course_ids is None:
+            course_ids = [-1]
+        if ticket_ids is None:
+            ticket_ids = [-1]
+        if ticket_type_ids is None:
+            ticket_type_ids = None
+
         # tickets (явное удаление)
         if ticket_ids:
             if ticket_ids[0] == -1:  # special case: delete all tickets
