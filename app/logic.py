@@ -1,16 +1,15 @@
 import json
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import Depends, HTTPException
 from sqlalchemy.orm import Session
-from app.models import Course, Ticket, TicketType, User
+from app.models import Ticket, TicketType, User
 from app.db import get_db
 import datetime
 from datetime import datetime, timedelta, time as dt_time
-from sqlalchemy import select, and_, func
+from sqlalchemy import select, and_
 from datetime import datetime, timedelta
 
 from models import *
-from db import engine
 
 # ----------------------------
 
@@ -75,11 +74,6 @@ def get_user(id: int = None, tg_id: int = None, db: Session = Depends(get_db)):
 
 def check_ticket_rules(user: User, ticket_type: str, timestamp: datetime | None, db: Session):
     settings = load_settings(db)
-    # DEBT_WEEKDAY = get_setting(db, "DEBT_WEEKDAY", int)
-    # START_TIME = datetime.strptime(get_setting(db, "START_TIME", str), "%H:%M").time()
-    # END_TIME = datetime.strptime(get_setting(db, "END_TIME", str), "%H:%M").time()
-    # SLOT_INTERVAL = get_setting(db, "SLOT_INTERVAL", int)
-    # DEBT_COOLDOWN = get_setting(db, "DEBT_COOLDOWN", int)
     tt = db.execute(
         select(TicketType).where(TicketType.name == ticket_type)
     ).scalar_one_or_none()
@@ -276,10 +270,6 @@ def generate_ticket_number(db: Session, ticket_type: str = "", last_number: int 
 
 def get_timeslots(db: Session):
     settings = load_settings(db)
-    # DEBT_WEEKDAY = get_setting(db, "DEBT_WEEKDAY", int)
-    # START_TIME = datetime.strptime(get_setting(db, "START_TIME", str), "%H:%M").time()
-    # END_TIME = datetime.strptime(get_setting(db, "END_TIME", str), "%H:%M").time()
-    # SLOT_INTERVAL = get_setting(db, "SLOT_INTERVAL", int)
     today = datetime.now().date()
 
     # вычисляем ближайшую и следующую пятницу (как в get_days)

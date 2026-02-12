@@ -8,7 +8,7 @@ from app.schemas import AdminUserIn
 router = APIRouter()
 
 
-@router.post("/") # TODO: add import/export
+@router.post("/")
 def upsert_user(
     id: Optional[int] = None,
     tg_id: Optional[str] = None,
@@ -22,8 +22,8 @@ def upsert_user(
         if not user:
             raise HTTPException(404)
         
-        if name is None and id is None:
-            raise HTTPException(400, detail="Name is required for creating a user")
+        # if name is None and id is None:
+        #     raise HTTPException(400, detail="Enter name to create or id to update")
 
         if name is not None:
             user.name = name
@@ -39,7 +39,7 @@ def upsert_user(
         return {"mode": "updated", "user": user}
 
     if not name:
-        raise HTTPException(400, detail="Name is required for creating a new user")
+        raise HTTPException(400, detail="Enter name to create or id to update")
 
     user = User(name=name, course_id=course_id, tg_id=tg_id, debt_streak=debt_streak)
     db.add(user)

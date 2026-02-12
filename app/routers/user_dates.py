@@ -3,9 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.models import Course
 from app.db import get_db
-# from logic import START_TIME, END_TIME, SLOT_INTERVAL
 from app.logic import  load_settings
-from app.schemas import UserTimeslotsIn
 
 router = APIRouter()
 
@@ -29,8 +27,6 @@ router = APIRouter()
 @router.get("/")
 def get_days(db: Session = Depends(get_db)):
     settings = load_settings(db)
-    # DEBT_WEEKDAY = get_setting(db, "DEBT_WEEKDAY", int)
-    # START_TIME = datetime.strptime(get_setting(db, "START_TIME", str), "%H:%M").time()
     today = datetime.datetime.now().date()
     days_ahead = (settings.DEBT_WEEKDAY - today.weekday()) % 7
     if days_ahead == 0 and datetime.datetime.now().time() >= settings.START_TIME:

@@ -11,7 +11,7 @@ router = APIRouter()
 @router.post("/")
 def upsert_ticket_type(
     id: Optional[int] = None,
-    name: str = Query(...),
+    name: Optional[str] = None,
     title: Optional[str] = None,
     max_per_user: Optional[int] = None,
     require_time: Optional[int] = None,
@@ -36,6 +36,9 @@ def upsert_ticket_type(
         db.commit()
         db.refresh(tt)
         return {"mode": "updated", "ticket_type": tt}
+
+    if name is None and id is None:
+        raise HTTPException(400, detail="Enter name to create or id to update")
 
     tt = TicketType(
         name=name,
