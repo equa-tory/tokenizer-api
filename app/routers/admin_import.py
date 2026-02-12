@@ -7,7 +7,7 @@ from app.models import User
 router = APIRouter()
 
 
-@router.post("/csv")
+@router.post("/")
 async def import_users_csv(file: UploadFile, db: Session = Depends(get_db)):
     if not file.filename.endswith(".csv"):
         raise HTTPException(400, detail="Only CSV files are allowed")

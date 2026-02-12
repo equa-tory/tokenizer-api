@@ -11,11 +11,51 @@ from datetime import datetime, timedelta
 
 from models import *
 from db import engine
-from config import *
 
 # ----------------------------
 
+#region SETTINGS
+from dataclasses import dataclass
 
+@dataclass
+class AppSettings:
+    DEBT_WEEKDAY: int
+    START_TIME: dt_time
+    END_TIME: dt_time
+    SLOT_INTERVAL: int
+    DEBT_COOLDOWN: int
+    MAX_TICKETS: int
+    MAX_SLOT_GAP: int
+    MAX_SLOT_SEQUENCE: int
+    MAX_USER_DEBT_STREAK: int
+    MAX_LOGS: int
+
+def get_setting(db: Session, key: str, cast_type=str):
+    setting = db.get(Setting, key)
+    if not setting:
+        raise Exception(f"Setting {key} not found")
+    return cast_type(setting.value)
+
+def load_settings(db: Session) -> AppSettings:
+    return AppSettings(
+        DEBT_WEEKDAY=get_setting(db, "DEBT_WEEKDAY", int),
+        START_TIME=datetime.strptime(
+            get_setting(db, "START_TIME", str), "%H:%M"
+        ).time(),
+        END_TIME=datetime.strptime(
+            get_setting(db, "END_TIME", str), "%H:%M"
+        ).time(),
+        SLOT_INTERVAL=get_setting(db, "SLOT_INTERVAL", int),
+        DEBT_COOLDOWN=get_setting(db, "DEBT_COOLDOWN", int),
+        MAX_TICKETS=get_setting(db, "MAX_TICKETS", int),
+        MAX_SLOT_GAP=get_setting(db, "MAX_SLOT_GAP", int),
+        MAX_SLOT_SEQUENCE=get_setting(db, "MAX_SLOT_SEQUENCE", int),
+        MAX_USER_DEBT_STREAK=get_setting(db, "MAX_USER_DEBT_STREAK", int),
+        MAX_LOGS=get_setting(db, "MAX_LOGS", int),
+    )
+#endregion
+
+# ----------------------------
 
 def get_user(id: int = None, tg_id: int = None, db: Session = Depends(get_db)):
     if not id and not tg_id:
@@ -23,7 +63,7 @@ def get_user(id: int = None, tg_id: int = None, db: Session = Depends(get_db)):
     if tg_id:
         user = db.execute(select(User).where(User.tg_id == tg_id)).scalar_one_or_none()
         if not user:
-            raise HTTPException(status_code=404, detail="TG User not found")
+            raise HTTPException(status_code=404, detail="TG_USER_NOT_FOUND")
 
     else:
         user = db.get(User, id)
@@ -34,6 +74,12 @@ def get_user(id: int = None, tg_id: int = None, db: Session = Depends(get_db)):
 
 
 def check_ticket_rules(user: User, ticket_type: str, timestamp: datetime | None, db: Session):
+    settings = load_settings(db)
+    # DEBT_WEEKDAY = get_setting(db, "DEBT_WEEKDAY", int)
+    # START_TIME = datetime.strptime(get_setting(db, "START_TIME", str), "%H:%M").time()
+    # END_TIME = datetime.strptime(get_setting(db, "END_TIME", str), "%H:%M").time()
+    # SLOT_INTERVAL = get_setting(db, "SLOT_INTERVAL", int)
+    # DEBT_COOLDOWN = get_setting(db, "DEBT_COOLDOWN", int)
     tt = db.execute(
         select(TicketType).where(TicketType.name == ticket_type)
     ).scalar_one_or_none()
@@ -49,12 +95,12 @@ def check_ticket_rules(user: User, ticket_type: str, timestamp: datetime | None,
 
         # 1. только будущее
         if timestamp <= now:
-            raise HTTPException(status_code=400, detail="Timestamp must be in the future")
+            raise HTTPException(status_code=400, detail="TIMESTAMP_IN_PAST")
 
         # 2. проверка даты (должна быть в ближайшую или следующую пятницу)
         today = now.date()
-        days_ahead = (DEBT_WEEKDAY - today.weekday()) % 7
-        if days_ahead == 0 and now.time() >= START_TIME:
+        days_ahead = (settings.DEBT_WEEKDAY - today.weekday()) % 7
+        if days_ahead == 0 and now.time() >= settings.START_TIME:
             days_ahead = 7
         first_friday = today + timedelta(days=days_ahead)
         second_friday = first_friday + timedelta(days=7)
@@ -62,11 +108,11 @@ def check_ticket_rules(user: User, ticket_type: str, timestamp: datetime | None,
             raise HTTPException(status_code=400, detail="Timestamp date must be on allowed days")
 
         # 3. проверка времени дня
-        if not (START_TIME <= timestamp.time() < END_TIME):
+        if not (settings.START_TIME <= timestamp.time() < settings.END_TIME):
             raise HTTPException(status_code=400, detail="Timestamp out of allowed time range")
 
         # 4. проверка кратности слоту
-        if timestamp.minute % SLOT_INTERVAL != 0 or timestamp.second != 0:
+        if timestamp.minute % settings.SLOT_INTERVAL != 0 or timestamp.second != 0:
             raise HTTPException(status_code=400, detail="Timestamp is not aligned with slot interval")
 
         # 5. слот не занят (через БД)   
@@ -80,7 +126,7 @@ def check_ticket_rules(user: User, ticket_type: str, timestamp: datetime | None,
         ).scalar_one_or_none()
 
         if taken:
-            raise HTTPException(status_code=400, detail="This time slot is already taken")
+            raise HTTPException(status_code=400, detail="TIMESLOT_TAKEN")
 
         # 6. слот не входит в ближайшие 20 минут (--++--+--)
         # 16:10, 16:40, 16:50, 17:20, 17:30
@@ -98,19 +144,19 @@ def check_ticket_rules(user: User, ticket_type: str, timestamp: datetime | None,
         for i in range(len(all_times)):
             count = 1
             for j in range(i+1, len(all_times)):
-                diff_slots = (all_times[j] - all_times[j-1]).total_seconds() / 60 / SLOT_INTERVAL
-                if diff_slots <= DEBT_SLOT_GAP:  # два слота подряд или через один
+                diff_slots = (all_times[j] - all_times[j-1]).total_seconds() / 60 / settings.SLOT_INTERVAL
+                if diff_slots <= settings.MAX_SLOT_GAP:  # два слота подряд или через один
                     count += 1
-                    if count > DEBT_SLOT_SEQ:
+                    if count > settings.MAX_SLOT_SEQUENCE:
                         raise HTTPException(
                             status_code=400,
-                            detail="Cannot book slots with less than one free slot in between"
+                            detail="MAX_SLOT_GAP_EXCEEDED"
                         )
                 else:
                     break
         
 
-    # --- cooldown logic --- # TODO: can be buggy (none ticket type)
+    # --- cooldown logic --- # can be buggy, i hope not (none ticket type)
     if ticket_type == db.execute(select(TicketType.name)).scalars().first():
         # get last ticket and check if N minutes have passed
         last_ticket = db.execute(
@@ -123,11 +169,11 @@ def check_ticket_rules(user: User, ticket_type: str, timestamp: datetime | None,
         if last_ticket and last_ticket.ticket_type and last_ticket.ticket_type.name == ticket_type:
             from datetime import datetime, timedelta
             now = datetime.utcnow()
-            cooldown = DEBT_COOLDOWN
+            cooldown = settings.DEBT_COOLDOWN
             if last_ticket.created_at and (now - last_ticket.created_at) < timedelta(minutes=cooldown):
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Wait at least {cooldown} minutes between issuing tickets of the same type"
+                    detail=f"TICKET_COOLDOWN"
                 )
 
 
@@ -160,7 +206,7 @@ def check_ticket_rules(user: User, ticket_type: str, timestamp: datetime | None,
     if tt.max_per_user is not None and len(user_tickets_of_type) >= tt.max_per_user:
         raise HTTPException(
             status_code=400,
-            detail="User has reached the maximum number of active tickets of this type"
+            detail="USER_MAX_TICKETS_EXCEEDED"
         )
 
     # --- debt-specific logic (kept but simplified) ---
@@ -172,15 +218,15 @@ def check_ticket_rules(user: User, ticket_type: str, timestamp: datetime | None,
             .limit(1)
         ).scalar_one_or_none()
 
-        if last_debt_user_id == user.id and user.debt_streak >= 2:
+        if last_debt_user_id == user.id and user.debt_streak >= settings.MAX_USER_DEBT_STREAK:
             raise HTTPException(
                 status_code=400,
-                detail="Cannot take debt more than twice in a row"
+                detail=f"DEBT_MAX_STREAK_EXCEEDED"
             )
 
         # reset streaks for others
         others = db.execute(
-            select(User).where(User.id != user.id, User.debt_streak >= 2)
+            select(User).where(User.id != user.id, User.debt_streak >= settings.MAX_USER_DEBT_STREAK)
         ).scalars().all()
 
         for u in others:
@@ -188,6 +234,7 @@ def check_ticket_rules(user: User, ticket_type: str, timestamp: datetime | None,
             db.add(u)
 
 def generate_ticket_number(db: Session, ticket_type: str = "", last_number: int = 0):
+    settings = load_settings(db)
     prefix = "None"
     if ticket_type:
         prefix = db.execute(
@@ -204,7 +251,7 @@ def generate_ticket_number(db: Session, ticket_type: str = "", last_number: int 
 
     # print(f"last: {last_number}")
 
-    if last_number >= MAX_TICKETS:
+    if last_number >= settings.MAX_TICKETS:
         number = 0
     else:
         number = last_number + 1
@@ -228,11 +275,16 @@ def generate_ticket_number(db: Session, ticket_type: str = "", last_number: int 
 #     return slots
 
 def get_timeslots(db: Session):
+    settings = load_settings(db)
+    # DEBT_WEEKDAY = get_setting(db, "DEBT_WEEKDAY", int)
+    # START_TIME = datetime.strptime(get_setting(db, "START_TIME", str), "%H:%M").time()
+    # END_TIME = datetime.strptime(get_setting(db, "END_TIME", str), "%H:%M").time()
+    # SLOT_INTERVAL = get_setting(db, "SLOT_INTERVAL", int)
     today = datetime.now().date()
 
     # вычисляем ближайшую и следующую пятницу (как в get_days)
-    days_ahead = (DEBT_WEEKDAY - today.weekday()) % 7
-    if days_ahead == 0 and datetime.now().time() >= START_TIME:
+    days_ahead = (settings.DEBT_WEEKDAY - today.weekday()) % 7
+    if days_ahead == 0 and datetime.now().time() >= settings.START_TIME:
         days_ahead = 7
 
     dates = [
@@ -243,8 +295,8 @@ def get_timeslots(db: Session):
     result = []
 
     for d in dates:
-        start_time = datetime.combine(d, START_TIME)
-        end_time = datetime.combine(d, END_TIME)
+        start_time = datetime.combine(d, settings.START_TIME)
+        end_time = datetime.combine(d, settings.END_TIME)
 
         slots = []
         current = start_time
@@ -258,7 +310,7 @@ def get_timeslots(db: Session):
                 "available": not bool(taken),
             })
 
-            current += timedelta(minutes=SLOT_INTERVAL)
+            current += timedelta(minutes=settings.SLOT_INTERVAL)
 
         result.append({
             "date": d.isoformat(),

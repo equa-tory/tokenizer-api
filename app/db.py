@@ -1,6 +1,6 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
-from app.models import Base, TicketType
+from app.models import Base, TicketType, Setting
 from time import sleep
 import os
 from dotenv import load_dotenv
@@ -27,6 +27,34 @@ def get_db():
     finally:
         db.close()
 
+
+# --- Default settings -----------------------
+# loog in config.py
+DEFAULT_SETTINGS = {
+    "DEBT_WEEKDAY": 4, # friday (def: 4)
+    "START_TIME": "16:00", # (def: 16:00)
+    "END_TIME": "18:00", # (def: 18:00)
+    "SLOT_INTERVAL": 10, # (def: 10)
+    "DEBT_COOLDOWN": 15, # (def: 15)
+    "MAX_TICKETS": 9999, # (def: 9999)
+    "MAX_SLOT_GAP": 1, # (def: 1)
+    "MAX_SLOT_SEQUENCE": 2, # (def: 2)
+    "MAX_USER_DEBT_STREAK": 2, # (def: 2)
+    "MAX_LOGS": -1, # -1 = no limit
+}
+
+def ensure_default_settings(db: Session):
+    existing = {s.key for s in db.query(Setting.key).all()}
+
+    to_create = [
+        Setting(key=k, value=str(v))
+        for k, v in DEFAULT_SETTINGS.items()
+        if k not in existing
+    ]
+
+    if to_create:
+        db.add_all(to_create)
+        db.commit()
 
 # --- Ensure default necessary TicketTypes exist -----------------------
 def ensure_default_tickettypes(db: Session) -> None:

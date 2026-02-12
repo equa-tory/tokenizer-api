@@ -8,7 +8,7 @@ from app.schemas import AdminUserIn
 router = APIRouter()
 
 
-@router.post("/")
+@router.post("/") # TODO: add import/export
 def upsert_user(
     id: Optional[int] = None,
     tg_id: Optional[str] = None,
