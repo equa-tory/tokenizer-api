@@ -155,7 +155,9 @@ def check_ticket_rules(user: User, ticket_type: str, timestamp: datetime | None,
         # get last ticket and check if N minutes have passed
         last_ticket = db.execute(
             select(Ticket)
-            .order_by(Ticket.timestamp.desc())
+            .join(TicketType)
+            .where(TicketType.name == ticket_type)
+            .order_by(Ticket.created_at.desc())
             .limit(1)
         ).scalar_one_or_none()
 

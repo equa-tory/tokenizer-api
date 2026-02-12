@@ -35,11 +35,11 @@ DEFAULT_SETTINGS = {
     "START_TIME": "16:00", # (def: 16:00)
     "END_TIME": "18:00", # (def: 18:00)
     "SLOT_INTERVAL": 10, # (def: 10)
-    "DEBT_COOLDOWN": 15, # (def: 15) # TODO: fix (doesn't work)
+    "DEBT_COOLDOWN": 0, # (def: 15)
     "MAX_TICKETS": 9999, # (def: 9999)
     "MAX_SLOT_GAP": 1, # (def: 1)
     "MAX_SLOT_SEQUENCE": 2, # (def: 2)
-    "MAX_USER_DEBT_STREAK": 2, # (def: 2)
+    "MAX_USER_DEBT_STREAK": 5, # (def: 2)
     "MAX_LOGS": -1, # -1 = no limit
 }
 
