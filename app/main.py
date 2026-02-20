@@ -28,6 +28,14 @@ from app.routers import (
 
 app = FastAPI(title="Tokenizer-API")
 
+from fastapi.middleware.cors import CORSMiddleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # или список доменов, которым разрешен доступ
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 #region --- Init ---
 @app.on_event("startup")
