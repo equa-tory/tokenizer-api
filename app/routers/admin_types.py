@@ -13,7 +13,7 @@ def upsert_ticket_type(
     id: Optional[int] = None,
     name: Optional[str] = None,
     title: Optional[str] = None,
-    max_per_user: Optional[int] = None,
+    max_per_day: Optional[int] = None,
     require_time: Optional[int] = None,
     symbol: Optional[str] = None,
     db: Session = Depends(get_db)
@@ -26,8 +26,8 @@ def upsert_ticket_type(
 
         if title is not None:
             tt.title = name
-        if max_per_user is not None:
-            tt.max_per_user = max_per_user
+        if max_per_day is not None:
+            tt.max_per_day = max_per_day
         if require_time is not None:
             tt.require_time = require_time
         if symbol is not None: 
@@ -43,7 +43,7 @@ def upsert_ticket_type(
     tt = TicketType(
         name=name,
         title=title or name,
-        max_per_user=max_per_user or 1,
+        max_per_day=max_per_day or 1,
         require_time=require_time or 0,
         symbol=symbol or name[0].upper()
     )

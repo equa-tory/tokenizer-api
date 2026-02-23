@@ -189,45 +189,62 @@ def check_ticket_rules(user: User, ticket_type: str, timestamp: datetime | None,
         # timestamp must be ignored completely
         timestamp = None
 
-    # --- max_per_user logic ---
-    user_tickets_of_type = db.execute(
-        select(Ticket)
-        .where(
-            Ticket.user_id == user.id,
-            Ticket.ticket_type_id == tt.id,
-            Ticket.status == "active",
-        )
-    ).scalars().all()
+    # --- max_per_day per day logic ---
+    if tt.max_per_day is not None:
+        user_tickets_of_type = db.execute(
+            select(Ticket)
+            .where(
+                Ticket.user_id == user.id,
+                Ticket.ticket_type_id == tt.id,
+                Ticket.status == "active",
+            )
+        ).scalars().all()
 
-    if tt.max_per_user is not None and len(user_tickets_of_type) >= tt.max_per_user:
-        raise HTTPException(
-            status_code=400,
-            detail="USER_MAX_TICKETS_EXCEEDED"
-        )
+        # если тип требует времени — считаем лимит по дате timestamp
+        if tt.require_time and timestamp:
+            target_date = timestamp.date()
+            same_day_tickets = [
+                t for t in user_tickets_of_type
+                if t.timestamp and t.timestamp.date() == target_date
+            ]
+        else:
+            # иначе считаем по дате создания
+            today = datetime.utcnow().date()
+            same_day_tickets = [
+                t for t in user_tickets_of_type
+                if t.created_at and t.created_at.date() == today
+            ]
+
+        if len(same_day_tickets) >= tt.max_per_day:
+            raise HTTPException(
+                status_code=400,
+                detail="USER_MAX_TICKETS_EXCEEDED_PER_DAY"
+            )
 
     # --- debt-specific logic (kept but simplified) ---
     if tt.name == "debt":
-        last_debt_user_id = db.execute(
-            select(Ticket.user_id)
-            .where(Ticket.ticket_type_id == tt.id)
-            .order_by(Ticket.timestamp.desc())
+        # последний активный debt талон
+        last_debt = db.execute(
+            select(Ticket)
+            .where(
+                Ticket.ticket_type_id == tt.id,
+                Ticket.status == "active"
+            )
+            .order_by(Ticket.created_at.desc())
             .limit(1)
         ).scalar_one_or_none()
 
-        if last_debt_user_id == user.id and user.debt_streak >= settings.MAX_USER_DEBT_STREAK:
-            raise HTTPException(
-                status_code=400,
-                detail=f"DEBT_MAX_STREAK_EXCEEDED"
-            )
-
-        # reset streaks for others
-        others = db.execute(
-            select(User).where(User.id != user.id, User.debt_streak >= settings.MAX_USER_DEBT_STREAK)
-        ).scalars().all()
-
-        for u in others:
-            u.debt_streak = 0
-            db.add(u)
+        # если последний debt был этого же пользователя — проверяем лимит подряд
+        if last_debt and last_debt.user_id == user.id:
+            if user.debt_streak >= settings.MAX_USER_DEBT_STREAK:
+                raise HTTPException(
+                    status_code=400,
+                    detail="DEBT_MAX_STREAK_EXCEEDED"
+                )
+        else:
+            # если другой пользователь взял debt — сбрасываем streak
+            user.debt_streak = 0
+            db.add(user)
 
 def generate_ticket_number(db: Session, ticket_type: str = "", last_number: int = 0):
     settings = load_settings(db)
