@@ -30,7 +30,7 @@ class TicketType(Base):
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
     title = Column(String, nullable=True)
-    max_per_user = Column(Integer, nullable=False)
+    max_per_day = Column(Integer, nullable=False)
     require_time = Column(Integer, nullable=True)  # В минутах или часах
     symbol = Column(String(1), nullable=True)
 
