@@ -39,7 +39,7 @@ DEFAULT_SETTINGS = {
     "MAX_TICKETS": 9999, # (def: 9999)
     "MAX_SLOT_GAP": 1, # (def: 1)
     "MAX_SLOT_SEQUENCE": 2, # (def: 2)
-    "MAX_USER_DEBT_STREAK": 5, # (def: 2)
+    "MAX_USER_DEBT_STREAK": 10, # (def: 2)
     "MAX_LOGS": -1, # -1 = no limit
 }
 
@@ -62,35 +62,35 @@ def ensure_default_tickettypes(db: Session) -> None:
         {
             "name": "debt",
             "title": "Сдача Задолженностей",
-            "max_per_day": 5,
+            "max_per_user": 5,
             "require_time": 1,
             "symbol": "З",
         },
         {
             "name": "zachet",
             "title": "Сдача Зачёта",
-            "max_per_day": 1,
+            "max_per_user": 1,
             "require_time": 0,
             "symbol": "Ë",
         },
         {
             "name": "exam",
             "title": "Сдача Экзамена",
-            "max_per_day": 1,
+            "max_per_user": 1,
             "require_time": 0,
             "symbol": "Э",
         },
         {
             "name": "report",
             "title": "Сдача Отчёта",
-            "max_per_day": 1,
+            "max_per_user": 1,
             "require_time": 0,
             "symbol": "О",
         },
         {
             "name": "diploma",
             "title": "Сдача Диплома",
-            "max_per_day": 1,
+            "max_per_user": 1,
             "require_time": 0,
             "symbol": "Д",
         },

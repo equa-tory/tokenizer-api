@@ -45,8 +45,7 @@ def book_ticket(
     )
 
     db.add(ticket)
-    # increase streak only for debt type
-    if ticket_type_obj.name == "debt":
+    if type == db.execute(select(TicketType.name)).scalars().first(): # if "debt"
         user.debt_streak += 1
         db.add(user)
     db.commit()

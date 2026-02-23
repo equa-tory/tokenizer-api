@@ -59,7 +59,7 @@ class AdminTicketTypeIn(BaseModel):
     id: Optional[int]
     name: str = Field(..., example="Name of the ticket type, used in requests/code")
     title: Optional[str] = Field(default=None, example="Display title of the ticket type, will be created of name field")
-    max_per_day: Optional[int] = Field(..., example="Maximum number of tickets per user")
+    max_per_user: Optional[int] = Field(..., example="Maximum number of tickets per user")
     require_time: Optional[int] = Field(default=None, example="(0/1) Does this type require time?")
     symbol: Optional[str]  = Field(default=None, example="(Ё) Display symbol of the ticket type, will be created of first letter of name field")
 
