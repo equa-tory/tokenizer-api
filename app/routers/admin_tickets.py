@@ -44,11 +44,15 @@ def upsert_ticket(
         return {"mode": "updated", "ticket": ticket}
 
     # --- CREATE ---
-    _name, _number = generate_ticket_number(db=db, last_number=number)
-    if not name:
-        name = _name
-    if not number:
-        number = _number
+    type_name = "None"
+    if ticket_type_id: # parse id int to name string
+        type_name = db.execute(
+            select(TicketType.name).where(TicketType.id == ticket_type_id)
+        ).scalar_one_or_none()
+
+    _name, _number = generate_ticket_number(db=db, ticket_type=type_name, last_number=number)
+    if not number: number = _number
+    if not name: name = _name
 
     ticket = Ticket(
         name=name,
