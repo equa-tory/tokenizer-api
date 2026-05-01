@@ -238,16 +238,29 @@ def check_ticket_rules(user: User, ticket_type: str, timestamp: datetime | None,
         ).scalar_one_or_none()
 
         # если последний debt был этого же пользователя — проверяем лимит подряд
-        if last_debt and last_debt.user_id == user.id:
-            if user.debt_streak >= settings.MAX_USER_DEBT_STREAK:
-                raise HTTPException(
-                    status_code=400,
-                    detail="DEBT_MAX_STREAK_EXCEEDED"
-                )
-        else:
-            # если другой пользователь взял debt — сбрасываем streak
-            user.debt_streak = 0
-            db.add(user)
+        same_day_debts = db.execute(
+            select(Ticket)
+            .where(
+                Ticket.ticket_type_id == tt.id,
+                Ticket.status == "active",
+                Ticket.timestamp != None,
+                Ticket.timestamp.cast(Date) == timestamp.date()
+            )
+            .order_by(Ticket.created_at.asc())
+        ).scalars().all()
+
+        streak = 0
+        for t in reversed(same_day_debts):
+            if t.user_id == user.id:
+                streak += 1
+            else:
+                break
+
+        if streak >= settings.MAX_USER_DEBT_STREAK:
+            raise HTTPException(
+                status_code=400,
+                detail="DEBT_MAX_STREAK_EXCEEDED"
+            )
 
 def generate_ticket_number(db: Session, ticket_type: str = "", last_number: int = 0):
     settings = load_settings(db)

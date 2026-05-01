@@ -22,7 +22,7 @@ class User(Base):
     tickets = relationship("Ticket", back_populates="user")
     course_id = Column(Integer, ForeignKey("courses.id"))
     course = relationship("Course", back_populates="users")
-    debt_streak = Column(Integer, default=0)
+    debt_streak = Column(Integer, default=0) # old
 
 
 class TicketType(Base):
