@@ -14,6 +14,7 @@ from app.routers import (
     admin_delete,
     admin_reset,
     admin_tickets,
+    admin_tlist,
     admin_logs,
     admin_backup,
     admin_setttings,
@@ -75,6 +76,7 @@ async def log_requests(request, call_next):
 app.include_router(admin_all.router, prefix="/all", tags=["_admin"])
 app.include_router(admin_types.router, prefix="/ticket/types", tags=["_admin"])
 app.include_router(admin_tickets.router, prefix="/ticket", tags=["_admin"])
+app.include_router(admin_tlist.router, prefix="/ticket/list", tags=["_admin"])
 app.include_router(admin_users.router, prefix="/users", tags=["_admin"])
 app.include_router(admin_delete.router, prefix="/delete", tags=["_admin"])
 app.include_router(admin_reset.router, prefix="/reset-db", tags=["_admin"])
