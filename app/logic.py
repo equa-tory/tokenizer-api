@@ -85,7 +85,7 @@ def check_ticket_rules(user: User, ticket_type: str, timestamp: datetime | None,
     from datetime import datetime, timedelta # TODO: (clean) wtf
 
     if timestamp:
-        now = datetime.utcnow()
+        now = datetime.now()
 
         # 1. только будущее
         if timestamp <= now:
@@ -167,7 +167,7 @@ def check_ticket_rules(user: User, ticket_type: str, timestamp: datetime | None,
         # print(f"tt: {ticket_type},\n lt: {last_ticket}")
         if last_ticket and last_ticket.ticket_type and last_ticket.ticket_type.name == ticket_type:
             from datetime import datetime, timedelta
-            now = datetime.utcnow()
+            now = datetime.now()
             cooldown = settings.DEBT_COOLDOWN
             if last_ticket.created_at and (now - last_ticket.created_at) < timedelta(minutes=cooldown):
                 raise HTTPException(
@@ -212,7 +212,7 @@ def check_ticket_rules(user: User, ticket_type: str, timestamp: datetime | None,
             ]
         else:
             # иначе считаем по дате создания
-            today = datetime.utcnow().date()
+            today = datetime.now().date()
             same_day_tickets = [
                 t for t in user_tickets_of_type
                 if t.created_at and t.created_at.date() == today

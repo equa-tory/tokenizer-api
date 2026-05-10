@@ -57,8 +57,8 @@ class Ticket(Base):
     name = Column(String, nullable=False)
     number = Column(Integer, nullable=False)
     status = Column(String, default="active")
-    timestamp = Column(DateTime)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime) # served timestamp; + visual title name
+    created_at = Column(DateTime, default=datetime.now) # booking time; + automatic; + logic checks
 
     user_id = Column(Integer, ForeignKey("users.id"))
     user = relationship("User", back_populates="tickets")
@@ -77,7 +77,7 @@ class Log(Base):
     status_code = Column(Integer, nullable=True)
 
     data = Column(JSON)        # input / meta
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.now)
 
 
 class Setting(Base):
