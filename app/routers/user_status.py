@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from app.models import Course, Ticket, TicketType, User
 from app.db import get_db
 from datetime import datetime
-from sqlalchemy import select
+from sqlalchemy import select, case
 from logic import get_user
 from app.schemas import UserStatusIn
 
@@ -28,10 +28,19 @@ def status(
     # if not tickets:
     #     raise HTTPException(status_code=404, detail="User has no tickets")
 
+    priority = case(
+        (Ticket.status == "serving", 0),
+        (Ticket.status != "active", 1),
+        else_=2
+    )
+
     # ---- Last queued ticket ---- #TODO: (later) change logic (not last taken ticket)
     last_ticket = db.execute(
         select(Ticket)
-        .order_by(Ticket.created_at.desc())
+        .order_by(
+            priority,
+            Ticket.created_at.desc()
+        )
         .limit(1)
     ).scalar_one_or_none()
 
