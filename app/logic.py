@@ -285,7 +285,7 @@ def generate_ticket_number(db: Session, ticket_type: str = "", last_number: int 
     else:
         number = last_number + 1
 
-    name = f"{prefix}-{str(number).zfill(4)}"
+    name = f"{prefix}-{str(number).zfill(len(str(settings.MAX_TICKETS)))}"
     return name, number
 
 
