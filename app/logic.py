@@ -288,6 +288,32 @@ def generate_ticket_number(db: Session, ticket_type: str = "", last_number: int 
     name = f"{prefix}-{str(number).zfill(len(str(settings.MAX_TICKETS)))}"
     return name, number
 
+def generate_timestamp(db: Session, ticket_type: str = "", max_weeks: int = 4):
+    settings = load_settings(db)
+
+    today = datetime.now().date()
+
+    for week in range(max_weeks):
+        days_ahead = (settings.DEBT_WEEKDAY - today.weekday()) % 7
+        target_date = today + timedelta(days=days_ahead + 7 * week)
+
+        start_time = datetime.combine(target_date, settings.START_TIME)
+        end_time = datetime.combine(target_date, settings.END_TIME)
+
+        current = start_time
+
+        while current < end_time:
+            taken = db.execute(
+                select(Ticket.id).where(Ticket.timestamp == current)
+            ).scalar_one_or_none()
+
+            if not taken:
+                return current
+
+            current += timedelta(minutes=settings.SLOT_INTERVAL)
+
+    raise Exception("No available slots in range")
+
 
 
 # if need only timeslots

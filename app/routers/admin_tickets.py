@@ -5,7 +5,7 @@ from sqlalchemy import select, and_, func
 from app.models import *
 from app.db import get_db
 from app.schemas import AdminTicketIn
-from app.logic import generate_ticket_number
+from app.logic import generate_ticket_number, generate_timestamp
 
 router = APIRouter()
 
@@ -53,6 +53,9 @@ def upsert_ticket(
     _name, _number = generate_ticket_number(db=db, ticket_type=type_name, last_number=number)
     if not number: number = _number
     if not name: name = _name
+
+    _timestamp = generate_timestamp(db=db, ticket_type=type_name)
+    if not timestamp: timestamp = _timestamp
 
     ticket = Ticket(
         name=name,
